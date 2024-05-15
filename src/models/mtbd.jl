@@ -1,16 +1,36 @@
-@with_kw mutable struct MTBDParameters <: BirthDeathParameters
-    n_types::Int64          # number of distinct subgroups / types
-    N₀::Vector{Int64}       # initial population distribution of each type a
-    λ::Matrix{Float64}      # birth rate of type a -> b
-    μ::Vector{Float64}      # death rate
-    γ::Matrix{Float64}      # mutation rate of type a -> b
-    ψ::Vector{Float64}      # extinct / ancestral sampling rate
-    ρ₀::Vector{Float64}     # extant sample rate
-    r::Vector{Float64}      # removal probability (upon sampling)
-    t_max::Float64  # maximum simulation time
-end
+"""
+    simulate(N₀::Vector{Int64}, λ::Matrix{Float64}, μ::Vector{Float64}, γ::Matrix{Float64}, ψ::Vector{Float64}, ρ₀::Vector{Float64}, r::Vector{Float64};
+             N_max::Union{Float64, Int64}=Inf, S_max::Union{Int64, Float64}=Inf, t_max::Union{Int64, Float64}=Inf)::Outbreak
 
+Simulates an epidemic outbreak using the Multi-Type Birth-Death (MTBD) model and returns the resulting outbreak.
 
+# Arguments
+- `N₀::Vector{Int64}`: Initial population distribution across types.
+- `λ::Matrix{Float64}`: Birth rates where `λ[a, b]` is the rate of type `a` giving birth to type `b`.
+- `μ::Vector{Float64}`: Death rates for each type.
+- `γ::Matrix{Float64}`: Mutation rates where `γ[a, b]` is the rate of type `a` mutating to type `b`.
+- `ψ::Vector{Float64}`: Sampling rates for each type.
+- `ρ₀::Vector{Float64}`: Extant sampling probabilities for each type.
+- `r::Vector{Float64}`: Removal probabilities for each type.
+- `N_max::Union{Float64, Int64}=Inf`: Maximum population size.
+- `S_max::Union{Int64, Float64}=Inf`: Maximum sample size.
+- `t_max::Union{Int64, Float64}=Inf`: Maximum simulation time.
+
+# Returns
+- `Outbreak`: An `Outbreak` object containing the parameters, trajectory, and linelist of the simulated outbreak.
+
+# Example
+```julia
+N₀ = [10, 5]
+λ = [0.5 0.3; 0.2 0.4]
+μ = [0.2, 0.1]
+γ = [0.1 0.2; 0.3 0.4]
+ψ = [0.1, 0.05]
+ρ₀ = [0.1, 0.2]
+r = [0.1, 0.1]
+outbreak = simulate(N₀, λ, μ, γ, ψ, ρ₀, r, N_max=1000, S_max=100, t_max=100.0)
+```
+"""
 function simulate(N₀::Vector{Int64},                   # Initial population distribution (across types)
                   λ::Matrix{Float64},                  # Birth rate: a -> b
                   μ::Vector{Float64},                  # Death rate
@@ -30,6 +50,28 @@ function simulate(N₀::Vector{Int64},                   # Initial population di
 end
 
 
+
+
+"""
+    simulate(params::MTBDParameters; N_max::Union{Float64, Int64}=Inf, S_max::Union{Float64, Int64}=Inf)::Outbreak
+
+Simulates an epidemic outbreak using the Multi-Type Birth-Death (MTBD) model with the given parameters and returns the resulting outbreak.
+
+# Arguments
+- `params::MTBDParameters`: A `MTBDParameters` struct containing the parameters for the MTBD model.
+- `N_max::Union{Float64, Int64}=Inf`: Maximum population size.
+- `S_max::Union{Float64, Int64}=Inf`: Maximum sample size.
+- `t_max::Union{Float64, Int64}=Inf`: Maximum simulation time.
+
+# Returns
+- `Outbreak`: An `Outbreak` object containing the parameters, trajectory, and linelist of the simulated outbreak.
+
+# Example
+```julia
+params = MTBDParameters(n_types=2, N₀=[10, 5], λ=[0.5 0.3; 0.2 0.4], μ=[0.2, 0.1], γ=[0.1 0.2; 0.3 0.4], ψ=[0.1, 0.05], ρ₀=[0.1, 0.2], r=[0.1, 0.1], t_max=100.0)
+outbreak = simulate(params, N_max=1000, S_max=100)
+```
+"""
 function simulate(params::MTBDParameters; N_max::Union{Float64, Int64}=Inf, S_max::Union{Float64, Int64}=Inf)::Outbreak
 
     @unpack n_types, N₀, λ, μ, γ, ψ, ρ₀, r, t_max = params

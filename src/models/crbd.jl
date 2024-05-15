@@ -1,29 +1,4 @@
 """
-    CRBDParameters
-
-A type for storing parameters of the Constant Rate Birth-Death (CRBD) model.
-
-## Fields
-- `N₀::Int64`: Initial population size.
-- `λ::Float64`: Birth rate.
-- `μ::Float64`: Death rate.
-- `ψ::Float64`: Extinct/ancestral sampling rate.
-- `ρ₀::Float64`: Extant sampling rate.
-- `r::Float64`: Removal probability (upon sampling).
-- `t_max::Float64`: Maximum simulation time.
-"""
-@with_kw mutable struct CRBDParameters <: BirthDeathParameters
-    N₀::Int64 = 1   # initial population size
-    λ::Float64      # birth rate
-    μ::Float64      # death rate
-    ψ::Float64      # extinct / ancestral sampling rate
-    ρ₀::Float64     # extant sampling rate
-    r::Float64      # removal probability (upon sampling)
-    t_max::Float64  # maximum simulation time
-end
-
-
-"""
     simulate(N₀::Int64, λ::Float64, μ::Float64, ψ::Float64, ρ₀::Float64, r::Float64;
              N_max::Union{Float64, Int64}=Inf, S_max::Union{Int64, Float64}=Inf, t_max::Union{Int64, Float64}=Inf)::Outbreak
 

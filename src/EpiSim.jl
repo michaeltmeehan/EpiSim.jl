@@ -17,7 +17,7 @@ include("process.jl")
 
 
 export EpiParameters, BirthDeathParameters, CRBDParameters, MTBDParameters, Outbreak
-export initialize_linelist, initialize_active
+export initialize_linelist, initialize_active, check_parameters
 export simulate, summarize, type_dist, offspring_dist, n_sampled
 
 
