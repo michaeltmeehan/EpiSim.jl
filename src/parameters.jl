@@ -89,6 +89,9 @@ Abstract type for compartmental model parameters. Inherits from `EpiParameters`.
 """
 abstract type CompartmentalParameters <: EpiParameters end
 
+
+
+
 """
     RenewalParameters <: EpiParameters
 
