@@ -323,6 +323,9 @@ end
 
 
 """
+    summarize(out::Outbreak)
+
+
     OutbreakSummary
 
 A struct to represent the summary of an epidemic outbreak, including various rates and metrics.
