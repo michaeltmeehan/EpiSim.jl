@@ -17,7 +17,7 @@ using EpiSim
 params = CRBDParameters(N₀=10, λ=0.5, μ=0.2, ψ=0.1, ρ₀=0.1, r=0.1, t_max=100.0)
 
 # Simulate an outbreak
-outbreak = simulate(params, N_max=1000, S_max=100)
+outbreak = simulate_outbreak(params, N_max=1000, S_max=100)
 ```
 """
 struct Outbreak
@@ -41,7 +41,7 @@ Prints a summary of the outbreak, including:
 # Example
 ```julia
 params = CRBDParameters(N₀=10, λ=0.5, μ=0.2, ψ=0.1, ρ₀=0.1, r=0.1, t_max=100.0)
-outbreak = simulate(params, N_max=1000, S_max=100)
+outbreak = simulate_outbreak(params, N_max=1000, S_max=100)
 println(outbreak)
 ```
 """

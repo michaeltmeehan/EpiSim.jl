@@ -1,5 +1,5 @@
 """
-    simulate(N₀::Vector{Int64}, λ::Matrix{Float64}, μ::Vector{Float64}, γ::Matrix{Float64}, ψ::Vector{Float64}, ρ₀::Vector{Float64}, r::Vector{Float64};
+    simulate_outbreak(N₀::Vector{Int64}, λ::Matrix{Float64}, μ::Vector{Float64}, γ::Matrix{Float64}, ψ::Vector{Float64}, ρ₀::Vector{Float64}, r::Vector{Float64};
              N_max::Union{Float64, Int64}=Inf, S_max::Union{Int64, Float64}=Inf, t_max::Union{Int64, Float64}=Inf)::Outbreak
 
 Simulates an epidemic outbreak using the Multi-Type Birth-Death (MTBD) model and returns the resulting outbreak.
@@ -28,10 +28,10 @@ N₀ = [10, 5]
 ψ = [0.1, 0.05]
 ρ₀ = [0.1, 0.2]
 r = [0.1, 0.1]
-outbreak = simulate(N₀, λ, μ, γ, ψ, ρ₀, r, N_max=1000, S_max=100, t_max=100.0)
+outbreak = simulate_outbreak(N₀, λ, μ, γ, ψ, ρ₀, r, N_max=1000, S_max=100, t_max=100.0)
 ```
 """
-function simulate(N₀::Vector{Int64},                   # Initial population distribution (across types)
+function simulate_outbreak(N₀::Vector{Int64},                   # Initial population distribution (across types)
                   λ::Matrix{Float64},                  # Birth rate: a -> b
                   μ::Vector{Float64},                  # Death rate
                   γ::Matrix{Float64},                  # Mutation rate: a -> b
@@ -46,14 +46,14 @@ function simulate(N₀::Vector{Int64},                   # Initial population di
 
     params = MTBDParameters(n_types, N₀, λ, μ, γ, ψ, ρ₀, r, t_max)
 
-    return simulate(params, N_max=N_max, S_max=S_max)
+    return simulate_outbreak(params, N_max=N_max, S_max=S_max)
 end
 
 
 
 
 """
-    simulate(params::MTBDParameters; N_max::Union{Float64, Int64}=Inf, S_max::Union{Float64, Int64}=Inf)::Outbreak
+    simulate_outbreak(params::MTBDParameters; N_max::Union{Float64, Int64}=Inf, S_max::Union{Float64, Int64}=Inf)::Outbreak
 
 Simulates an epidemic outbreak using the Multi-Type Birth-Death (MTBD) model with the given parameters and returns the resulting outbreak.
 
@@ -69,10 +69,10 @@ Simulates an epidemic outbreak using the Multi-Type Birth-Death (MTBD) model wit
 # Example
 ```julia
 params = MTBDParameters(n_types=2, N₀=[10, 5], λ=[0.5 0.3; 0.2 0.4], μ=[0.2, 0.1], γ=[0.1 0.2; 0.3 0.4], ψ=[0.1, 0.05], ρ₀=[0.1, 0.2], r=[0.1, 0.1], t_max=100.0)
-outbreak = simulate(params, N_max=1000, S_max=100)
+outbreak = simulate_outbreak(params, N_max=1000, S_max=100)
 ```
 """
-function simulate(params::MTBDParameters; N_max::Union{Float64, Int64}=Inf, S_max::Union{Float64, Int64}=Inf)::Outbreak
+function simulate_outbreak(params::MTBDParameters; N_max::Union{Float64, Int64}=Inf, S_max::Union{Float64, Int64}=Inf)::Outbreak
 
     @unpack n_types, N₀, λ, μ, γ, ψ, ρ₀, r, t_max = params
     check_parameters(params)

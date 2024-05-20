@@ -12,7 +12,7 @@
         r=[0.1, 0.1],
         t_max=100.0
     )
-    outbreak = simulate(params, N_max=1000, S_max=100)
+    outbreak = simulate_outbreak(params, N_max=1000, S_max=100)
     
     test_linelist_not_empty(outbreak)
     test_linelist_columns(outbreak)
@@ -44,7 +44,7 @@
         r=[0.1, 0.1],
         t_max=100.0
     )
-    outbreak_zero_pop = simulate(params_zero_pop, N_max=1000, S_max=100)
+    outbreak_zero_pop = simulate_outbreak(params_zero_pop, N_max=1000, S_max=100)
     @test isempty(outbreak_zero_pop.linelist)  # No events should occur with zero initial population
 
     params_max_pop = MTBDParameters(
@@ -58,7 +58,7 @@
         r=[0.1, 0.1],
         t_max=100.0
     )
-    outbreak_max_pop = simulate(params_max_pop, N_max=1, S_max=100)
+    outbreak_max_pop = simulate_outbreak(params_max_pop, N_max=1, S_max=100)
     @test all(outbreak_max_pop.traj[2:end, :] .<= 1)  # Population size should not exceed N_max=1 at any time point
 
     params_max_sample = MTBDParameters(
@@ -72,7 +72,7 @@
         r=[0.1, 0.1],
         t_max=100.0
     )
-    outbreak_max_sample = simulate(params_max_sample, N_max=1000, S_max=1)
+    outbreak_max_sample = simulate_outbreak(params_max_sample, N_max=1000, S_max=1)
     @test count(x -> x >= 0, outbreak_max_sample.linelist.t_sam) == 1  # Sampled individuals should not exceed S_max=1
 
     # Test time progression

@@ -1,5 +1,5 @@
 """
-    simulate(N₀::Int64, λ::Float64, μ::Float64, ψ::Float64, ρ₀::Float64, r::Float64;
+    simulate_outbreak(N₀::Int64, λ::Float64, μ::Float64, ψ::Float64, ρ₀::Float64, r::Float64;
              N_max::Union{Float64, Int64}=Inf, S_max::Union{Int64, Float64}=Inf, t_max::Union{Int64, Float64}=Inf)::Outbreak
 
 Simulates an outbreak using the specified parameters for the CRBD model.
@@ -20,7 +20,7 @@ Simulates an outbreak using the specified parameters for the CRBD model.
 
 This function creates a `CRBDParameters` instance using the provided arguments and calls the `simulate` function that takes `CRBDParameters` as input.
 """
-function simulate(N₀::Int64, 
+function simulate_outbreak(N₀::Int64, 
                   λ::Float64, 
                   μ::Float64, 
                   ψ::Float64,
@@ -32,12 +32,12 @@ function simulate(N₀::Int64,
 
     params = CRBDParameters(N₀, λ, μ, ψ, ρ₀, r, t_max)
 
-    return simulate(params, N_max=N_max, S_max=S_max)
+    return simulate_outbreak(params, N_max=N_max, S_max=S_max)
 end
 
 
 """
-    simulate(params::CRBDParameters; N_max::Union{Float64, Int64}=Inf, S_max::Union{Float64, Int64}=Inf)
+    simulate_outbreak(params::CRBDParameters; N_max::Union{Float64, Int64}=Inf, S_max::Union{Float64, Int64}=Inf)
 
 Simulates an outbreak using the CRBD model.
 
@@ -49,7 +49,7 @@ Simulates an outbreak using the CRBD model.
 # Returns
 - `Outbreak`: The resulting outbreak object containing the linelist and trajectory.
 """
-function simulate(params::CRBDParameters; N_max::Union{Float64, Int64}=Inf, S_max::Union{Float64, Int64}=Inf)::Outbreak
+function simulate_outbreak(params::CRBDParameters; N_max::Union{Float64, Int64}=Inf, S_max::Union{Float64, Int64}=Inf)::Outbreak
 
     @unpack N₀, λ, μ, ψ, ρ₀, r, t_max = params
     check_parameters(params)

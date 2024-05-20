@@ -358,7 +358,7 @@ params = MTBDParameters(
 )
 
 # Simulate the outbreak
-outbreak = simulate(params, N_max=1000, S_max=100)
+outbreak = simulate_outbreak(params, N_max=1000, S_max=100)
 
 # Summarize the outbreak
 summary = summarize(outbreak)

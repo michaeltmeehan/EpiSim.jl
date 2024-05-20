@@ -7,7 +7,7 @@ EpiSim.jl is a Julia package designed for stochastic simulation of epidemic outb
 To install EpiSim.jl, use the following command in the Julia REPL:
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/yourusername/EpiSim.jl.git")
+Pkg.add(url="https://github.com/michaeltmeehan/EpiSim.jl.git")
 ```
 ## Usage
 
@@ -29,7 +29,7 @@ params = CRBDParameters(
 )
 
 # Simulate the outbreak
-outbreak = simulate(params, N_max=1000, S_max=100)
+outbreak = simulate_outbreak(params, N_max=1000, S_max=100)
 
 # Summarize the outbreak
 summary = summarize(outbreak)
@@ -54,7 +54,7 @@ params = MTBDParameters(
 )
 
 # Simulate the outbreak
-outbreak = simulate(params, N_max=1000, S_max=100)
+outbreak = simulate_outbreak(params, N_max=1000, S_max=100)
 
 # Summarize the outbreak
 summary = summarize(outbreak)
@@ -77,7 +77,7 @@ Pkg.test("EpiSim")
 ```
 ## Contributing
 
-Contributions to EpiSim.jl are welcome. Please feel free to open issues or submit pull requests on the GitHub repository: https://github.com/yourusername/EpiSim.jl
+Contributions to EpiSim.jl are welcome. Please feel free to open issues or submit pull requests on the GitHub repository: https://github.com/michaeltmeehan/EpiSim.jl
 
 ## License
 
