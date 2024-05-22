@@ -2,8 +2,6 @@ module EpiSim
 
 using DataFrames
 using DataFramesMeta
-using GraphPlot
-using Graphs
 using Lazy
 using Parameters
 using Plots

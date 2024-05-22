@@ -28,9 +28,9 @@ end
         outbreak.traj[1,:], permutedims(sum(outbreak.traj[2:end, :], dims=1))
     end
 
-    t_final = ceil(maximum(outbreak.linelist.t_birth))
+    t_final = ceil(maximum(vcat(outbreak.linelist.t_birth, outbreak.linelist.t_death, outbreak.linelist.t_sam)))
     id_final = maximum(outbreak.linelist.child_id)
-    scale = 10 / id_final
+    scale = minimum([1., 10 / id_final])
 
     # Incidence plot
     @series begin
