@@ -28,7 +28,9 @@ end
         outbreak.traj[1,:], permutedims(sum(outbreak.traj[2:end, :], dims=1))
     end
 
-    t_final = ceil(maximum(vcat(outbreak.linelist.t_birth, outbreak.linelist.t_death, outbreak.linelist.t_sam)))
+    infections_times = outbreak.linelist.t_birth
+    death_times = [t for t in outbreak.linelist.t_death if !isinf(t)]
+    t_final = ceil(maximum(vcat(infections_times, death_times)))
     id_final = maximum(outbreak.linelist.child_id)
     scale = minimum([1., 10 / id_final])
 
