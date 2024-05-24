@@ -1,5 +1,7 @@
 module EpiSim
 
+# using CairoMakie # Experimental
+# using ColorSchemes
 using DataFrames
 using DataFramesMeta
 using Lazy
