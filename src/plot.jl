@@ -14,7 +14,7 @@ end
     
     # Merged prevalence / incidence plot
     grid := false
-    xlabel := nothing
+    xlabel := "Time"
     subplot := 1
     color := RGB(0.2, 0.4, 0.6)
 
@@ -83,6 +83,7 @@ end
         if show_transmission
             if parent != 0
                 @series begin
+                    lw := scale
                     alpha := 0.3
                     color := color_from_id(id)
                     [t_birth, t_birth], [parent, id-0.4]
