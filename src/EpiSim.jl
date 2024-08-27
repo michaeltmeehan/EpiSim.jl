@@ -21,7 +21,7 @@ include("models/mtbd.jl")
 include("process.jl")
 include("plot.jl")
 
-export EpiParameters, BirthDeathParameters, CRBDParameters, MTBDParameters, Outbreak
+export EpiParameters, BirthDeathParameters, CRBDParameters, MTBDParameters, SIRParameters, Outbreak
 export initialize_linelist, initialize_active, check_parameters
 export simulate_outbreak, summarize, type_dist, offspring_dist, n_sampled, n_deceased
 export plot_outbreak, create_transmission_graph

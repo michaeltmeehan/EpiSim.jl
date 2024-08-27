@@ -91,6 +91,14 @@ abstract type CompartmentalParameters <: EpiParameters end
 
 
 
+@with_kw mutable struct SIRParameters <: CompartmentalParameters
+    β::Float64 = 2.0    # transmission rate
+    γ::Float64 = 1.0   # recovery rate
+    N₀::Int64 = 1000    # initial population size
+    I₀::Int64 = 1    # initial number of infected individuals
+    t_max::Float64 = 100.0  # maximum simulation time
+end
+
 
 """
     RenewalParameters <: EpiParameters
