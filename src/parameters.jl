@@ -90,10 +90,30 @@ Abstract type for compartmental model parameters. Inherits from `EpiParameters`.
 abstract type CompartmentalParameters <: EpiParameters end
 
 
+# Add docstring for SIRParameters
+"""
+    SIRParameters
 
+A type for storing parameters of the Susceptible-Infectious-Recovered (SIR) model.
+
+## Fields
+- `β::Float64`: Transmission rate.
+- `γ::Float64`: Recovery rate.
+- `ψ::Float64`: Sampling rate.
+- `N₀::Int64`: Initial population size.
+- `I₀::Int64`: Initial number of infected individuals.
+- `t_max::Float64`: Maximum simulation time.
+
+# Example
+```julia
+params = SIRParameters(β=2.0, γ=1.0, ψ=0.5, N₀=1000, I₀=1, t_max=100.0)
+```
+"""
 @with_kw mutable struct SIRParameters <: CompartmentalParameters
     β::Float64 = 2.0    # transmission rate
     γ::Float64 = 1.0   # recovery rate
+    ψ::Float64 = 0.5   # sampling rate
+    r::Float64 = 1.0     # removal probability (upon sampling)
     N₀::Int64 = 1000    # initial population size
     I₀::Int64 = 1    # initial number of infected individuals
     t_max::Float64 = 100.0  # maximum simulation time

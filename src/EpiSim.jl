@@ -18,6 +18,7 @@ include("outbreak.jl")
 include("models/bdutils.jl")
 include("models/crbd.jl")
 include("models/mtbd.jl")
+include("models/sir.jl")
 include("process.jl")
 include("plot.jl")
 
