@@ -86,6 +86,16 @@ function summarize(parms::MTBDParameters)
 end
 
 
+
+function summarize(parms::SIRParameters)
+    removal_rate = parms.γ
+    println("Lifespan   : ", 1. ./ removal_rate)
+    R₀ = parms.β / removal_rate
+    println("R₀         : ", R₀)
+    println("Sample rate: ", parms.ψ ./ removal_rate)
+end
+
+
 """
     n_sampled(linelist::DataFrame) -> Int
 
