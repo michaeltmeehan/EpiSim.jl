@@ -39,8 +39,8 @@ using .Models
 export Models
 export SIRModel, SEIRModel, BirthDeathModel, MultiTypeBirthDeathModel, simulate_chain
 
-include("Trees/SampledTransmissionTree.jl")
+include("Trees/TransmissionTree.jl")
 
-export SampledTransmissionTree, extract_sampled_tree
+export TransmissionTree, extract_sampled_tree
 
 end # module EpiSim

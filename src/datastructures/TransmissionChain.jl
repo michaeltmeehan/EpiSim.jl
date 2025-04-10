@@ -8,7 +8,6 @@ mutable struct TransmissionChain
     infectors::Vector{Int}
     infection_times::Vector{Float64}
     sampling_times::Vector{Float64}
-    sampling_ids::Vector{Int}
 end
 
 
@@ -16,16 +15,18 @@ TransmissionChain(seed::Int) = TransmissionChain(
     fill(0, seed),
     fill(0.0, seed),
     fill(NaN, seed),
-    Vector{Int}()
 )
+
+
+Base.getindex(chain::TransmissionChain, i::Int) = (chain.infectors[i], chain.infection_times[i])
 
 
 function Base.show(io::IO, chain::TransmissionChain)
     n_infected = length(chain.infectors)
-    n_sampled = length(chain.sampling_ids)
     
     inf_times = chain.infection_times
     samp_times = filter(!isnan, chain.sampling_times)
+    n_sampled = length(samp_times)
 
     inf_range = isempty(inf_times) ? "N/A" : @sprintf("%.2f–%.2f", minimum(inf_times), maximum(inf_times))
     samp_range = isempty(samp_times) ? "N/A" : @sprintf("%.2f–%.2f", minimum(samp_times), maximum(samp_times))
@@ -46,7 +47,6 @@ end
 
 
 function sampling!(chain::TransmissionChain, sampled::Int, sampling_time::Float64)
-    push!(chain.sampling_ids, sampled)
     chain.sampling_times[sampled] = sampling_time
 end
 
