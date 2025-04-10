@@ -52,6 +52,16 @@ function Base.show(io::IO, tree::HostTree)
 end
 
 
+function sort_tree_by_infection_time!(tree::HostTree)
+    if !issorted(tree.infection_times)
+        perm = sortperm(tree.infection_times)
+        tree.infectees = tree.infectees[perm]
+        tree.infection_times = tree.infection_times[perm]
+        tree.sampling_times = tree.sampling_times[perm]
+    end
+end
+
+
 struct TransmissionTree
     hosts::Dict{Int, HostTree}
     root::Int
@@ -118,18 +128,8 @@ function extract_sampled_tree(infectors::Vector{Int},
             end
         end
     end
-    sort_tree_by_infection_time!(hosts)
-    return TransmissionTree(hosts, 0)
-end
-
-
-function sort_tree_by_infection_time!(tree::Dict{Int, HostTree})
-    for i in values(tree)
-        if !issorted(i.infection_times)
-            perm = sortperm(i.infection_times)
-            i.infectees = i.infectees[perm]
-            i.infection_times = i.infection_times[perm]
-            i.sampling_times = i.sampling_times[perm]
-        end
+    for tree in values(hosts)
+        sort_tree_by_infection_time!(tree)
     end
+    return TransmissionTree(hosts, 0)
 end
