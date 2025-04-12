@@ -2,6 +2,7 @@ module EpiSim
 
 # using CairoMakie # Experimental
 # using ColorSchemes
+using Crayons
 using DataFrames
 using DataFramesMeta
 using Lazy
@@ -14,22 +15,11 @@ using RecursiveArrayTools
 using StatsBase
 using UnPack
 
-# include("parameters.jl")
-# include("outbreak.jl")
-# include("models/bdutils.jl")
-# include("models/crbd.jl")
-# include("models/mtbd.jl")
-# include("models/sir.jl")
-# include("process.jl")
-# include("plot.jl")
 
-# export EpiParameters, BirthDeathParameters, CRBDParameters, MTBDParameters, SIRParameters, Outbreak
-# export initialize_linelist, initialize_active, check_parameters
-# export simulate_outbreak, summarize, type_dist, offspring_dist, n_sampled, n_deceased
-# export plot_outbreak, create_transmission_graph
+include("DataStructures/EpiEvent.jl")
+using .EpiEvent
 
-include("DataStructures/TransmissionChain.jl")
-using .Transmission
+export incidence, get_sampled_events
 
 include("utils/random_ops.jl")
 
@@ -37,10 +27,11 @@ include("models/Models.jl")
 using .Models
 
 export Models
-export SIRModel, SEIRModel, BirthDeathModel, MultiTypeBirthDeathModel, simulate_chain
+export BirthDeathModel, simulate_outbreak
+# export SIRModel, SEIRModel, BirthDeathModel, MultiTypeBirthDeathModel
 
-include("Trees/TransmissionTree.jl")
+# include("Trees/TransmissionTree.jl")
 
-export TransmissionTree, extract_sampled_tree
+# export TransmissionTree, extract_sampled_tree
 
 end # module EpiSim

@@ -16,19 +16,23 @@ function update_event_rates!(event_rates::Vector{Float64}, model::BirthDeathMode
 end
 
 
-function simulate_chain(model::BirthDeathModel;
-                        N_max::Int=10_000, 
-                        t_max::Float64=100.0, 
-                        S_max::Int=100, 
-                        I_init::Int=1)
+function simulate_outbreak(model::BirthDeathModel;
+                           N_max::Int=10_000, 
+                           t_max::Float64=100.0, 
+                           S_max::Int=100, 
+                           I_init::Int=1)
 
     I = I_init
     n_cumulative = I_init
     n_sampled = 0
 
-    infected = collect(1:I_init)
+    currently_infected = collect(1:I_init)
 
-    chain = TransmissionChain(I_init)
+    events = Vector{AbstractEpiEvent}()
+
+    for seed_host in 1:I_init
+        push!(events, Seed(seed_host, 0.0))
+    end
 
     # Pre-calculate event rates
     event_rates = Vector{Float64}(undef, 3)
@@ -37,7 +41,7 @@ function simulate_chain(model::BirthDeathModel;
     
     t = 0.0
 
-    while !isempty(infected) && n_cumulative < N_max && n_sampled < S_max
+    while !isempty(currently_infected) && n_cumulative < N_max && n_sampled < S_max
         rand_number = rand()
         t -= log(rand_number) / (total_event_rate * I)
         t > t_max && break
@@ -46,20 +50,22 @@ function simulate_chain(model::BirthDeathModel;
             # Birth event
             I += 1
             n_cumulative += 1
-            infector = sample(infected)
-            push!(infected, n_cumulative)
-            infection!(chain, infector, t)
+            infectee = n_cumulative         # Label infected individuals sequentially
+            infector = sample(currently_infected)
+            push!(currently_infected, infectee)
+            transmission!(events, infector, infectee, t)
         elseif rand_number ≤ (event_rates[1] + event_rates[2]) / total_event_rate
             # Death event
             I -= 1
-            pop_random!(infected)
+            recovered = pop_random!(currently_infected)
+            recovery!(events, recovered, t)
         else
             # Sampling event
             I -= 1
             n_sampled += 1
-            sampled = pop_random!(infected)
-            sampling!(chain, sampled, t)
+            sampled = pop_random!(currently_infected)
+            sampling!(events, sampled, t)
         end
     end
-    return chain
+    return events
 end
