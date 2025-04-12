@@ -27,7 +27,8 @@ include("models/Models.jl")
 using .Models
 
 export Models
-export BirthDeathModel, simulate_outbreak
+export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel
+export simulate_outbreak
 # export SIRModel, SEIRModel, BirthDeathModel, MultiTypeBirthDeathModel
 
 # include("Trees/TransmissionTree.jl")

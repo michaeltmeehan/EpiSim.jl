@@ -10,7 +10,7 @@ using Plots
 
 export Seed, Transmission, Sampling, Recovery, AbstractEpiEvent
 export incidence
-export transmission!, sampling!, recovery!, get_sampled_events
+export transmission!, sampling!, recovery!, activation!, get_sampled_events
 
 abstract type AbstractEpiEvent end
 

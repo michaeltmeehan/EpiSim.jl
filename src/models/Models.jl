@@ -7,12 +7,12 @@ import StatsBase: sample, wsample
 using ..EpiSim: pop_random!
 
 include("AbstractEpiModel.jl")
-# include("SIRModel.jl")
-# include("SEIRModel.jl")
+include("SIRModel.jl")
+include("SEIRModel.jl")
 include("BirthDeathModel.jl")
-# include("MultiTypeBirthDeathModel.jl")
+include("MultiTypeBirthDeathModel.jl")
 
-export BirthDeathModel, simulate_outbreak
-# export SIRModel, SEIRModel, BirthDeathModel, MultiTypeBirthDeathModel, simulate_chain
+export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel
+export simulate_outbreak
 
 end

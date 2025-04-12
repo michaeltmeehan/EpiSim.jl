@@ -6,7 +6,10 @@ struct SIRModel <: AbstractEpiModel
 end
 
 
-@inline function update_event_rates!(event_rates::Vector{Float64}, model::SIRModel, S::Int, I::Int)
+@inline function update_event_rates!(event_rates::Vector{Float64}, 
+                                     model::SIRModel, 
+                                     S::Int, 
+                                     I::Int)
     β = model.transmission_rate
     γ = model.recovery_rate
     ψ = model.sampling_rate
@@ -18,10 +21,10 @@ end
 end
 
 
-function simulate_chain(model::SIRModel; 
-                        S_init::Int=9999, 
-                        I_init::Int=1,
-                        S_max::Int=100)
+function simulate_outbreak(model::SIRModel; 
+                           S_init::Int=9999, 
+                           I_init::Int=1,
+                           S_max::Int=100)
 
     # Initialize population parameters
     S = S_init
@@ -30,15 +33,19 @@ function simulate_chain(model::SIRModel;
     # Initialize the simulation parameters
     n_cumulative = I_init
     n_sampled = 0
-    infected = Vector{Int}(undef, I_init)
-    infected[1:I_init] .= 1:I_init
+    currently_infected = collect(1:I_init)
 
-    chain = TransmissionChain(I_init)
+    events = Vector{AbstractEpiEvent}()
     event_rates = Vector{Float64}(undef, 3)
     
     t = 0.0
+    
+    # Add initial infections as seeds
+    for i in 1:I_init
+        push!(events, Seed(i, 0.0))
+    end
 
-    while !isempty(infected) && n_sampled < S_max
+    while !isempty(currently_infected) && n_sampled < S_max
 
         update_event_rates!(event_rates, model, S, I)
         total_event_rate = sum(event_rates)
@@ -51,18 +58,24 @@ function simulate_chain(model::SIRModel;
             S -= 1
             I += 1
             n_cumulative += 1
-            infection!(chain, sample(infected), t)
-            push!(infected, n_cumulative)
+            infectee = n_cumulative
+            
+            # Get a random infector from the infected pool
+            infector = sample(currently_infected)
+            transmission!(events, infector, infectee, t)
+            push!(currently_infected, infectee)
         elseif rand_number ≤ (event_rates[1] + event_rates[2]) / total_event_rate
             # Recovery event
             I -= 1
-            pop_random!(infected)
+            recovered = pop_random!(currently_infected)
+            recovery!(events, recovered, t)
         else
             # Sampling event
             I -= 1
+            sampled = pop_random!(currently_infected)
+            sampling!(events, sampled, t)
             n_sampled += 1
-            sampling!(chain, pop_random!(infected), t)
         end
     end
-    return chain
+    return events
 end

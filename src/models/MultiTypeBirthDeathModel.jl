@@ -28,7 +28,7 @@ function update_event_rates!(event_rates::Vector{Float64}, model::MultiTypeBirth
 end
 
 
-function simulate_chain(model::MultiTypeBirthDeathModel;
+function simulate_outbreak(model::MultiTypeBirthDeathModel;
                         I_init::Vector{Int}=[1, 0],
                         N_max::Int=10_000,
                         S_max::Int=100)
@@ -37,16 +37,23 @@ function simulate_chain(model::MultiTypeBirthDeathModel;
     n_cumulative = sum(I_init)
     n_sampled = 0
 
-    infected = [collect(1:I_init[type]) for type in eachindex(I_init)]
+    currently_infected = [collect(1:I_init[type]) for type in eachindex(I_init)]
 
-    chain = TransmissionChain(sum(I_init))
+    events = Vector{AbstractEpiEvent}()
 
     # Pre-calculate event rates
     event_rates = Vector{Float64}(undef, 3)
-
+    
     t = 0.0
+    
+    # Add initial infections as seeds
+    for type in eachindex(I_init)
+        for i in 1:I_init[type]
+            push!(events, Seed(i, 0.0))
+        end
+    end
 
-    while !all(isempty.(infected)) && n_cumulative < N_max && n_sampled < S_max
+    while !all(isempty.(currently_infected)) && n_cumulative < N_max && n_sampled < S_max
         
         update_event_rates!(event_rates, model, I)
         total_event_rate = sum(event_rates)
@@ -61,22 +68,24 @@ function simulate_chain(model::MultiTypeBirthDeathModel;
             child_type = wsample(1:model.n_types, model.birth_rate[parent_type, :])
             I[child_type] += 1
             n_cumulative += 1
-            infector = sample(infected[parent_type])
-            push!(infected[child_type], n_cumulative)
-            infection!(chain, infector, t)
+            infectee = n_cumulative         # Label infected individuals sequentially
+            infector = sample(currently_infected[parent_type])
+            push!(currently_infected[child_type], infectee)
+            transmission!(events, infector, infectee, t)
         elseif rand_number ≤ (event_rates[1] + event_rates[2]) / total_event_rate
             # Death event
             death_type = wsample(1:model.n_types, I)
             I[death_type] -= 1
-            pop_random!(infected[death_type])
+            recovered = pop_random!(currently_infected[death_type])
+            recovery!(events, recovered, t)
         else
             # Sampling event
             sampled_type = wsample(1:model.n_types, I)
             I[sampled_type] -= 1
             n_sampled += 1
-            sampled = pop_random!(infected[sampled_type])
-            sampling!(chain, sampled, t)
+            sampled = pop_random!(currently_infected[sampled_type])
+            sampling!(events, sampled, t)
         end
     end
-    return chain
+    return events
 end

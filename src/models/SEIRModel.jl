@@ -21,7 +21,7 @@ function update_event_rates!(event_rates::Vector{Float64}, model::SEIRModel, S::
 end
 
 
-function simulate_chain(model::SEIRModel;
+function simulate_outbreak(model::SEIRModel;
                         S_init::Int=9999, 
                         E_init::Int=0,
                         I_init::Int=1,
@@ -33,18 +33,33 @@ function simulate_chain(model::SEIRModel;
     I = I_init
      
     # Initialize the simulation parameters
-    n_cumulative = I_init
+    n_cumulative = E_init + I_init
     n_sampled = 0
-    exposed = Vector{Int}(undef, E_init)
-    infected = Vector{Int}(undef, I_init)
-    infected[1:I_init] .= 1:I_init
+    currently_exposed = Vector{Int}(undef, E_init)
+    if E_init > 0
+        currently_exposed[1:E_init] .= 1:E_init
+    end
+    
+    currently_infected = Vector{Int}(undef, I_init)
+    if I_init > 0
+        currently_infected[1:I_init] .= (E_init + 1):(E_init + I_init)
+    end
 
-    chain = TransmissionChain(I_init)
+    events = Vector{AbstractEpiEvent}()
     event_rates = Vector{Float64}(undef, 4)
     
     t = 0.0
 
-    while !isempty(infected) && n_sampled < S_max
+    # Add initial infections as seeds
+    for i in 1:E_init
+        push!(events, Seed(i, 0.0))
+    end
+    
+    for i in (E_init + 1):(E_init + I_init)
+        push!(events, Seed(i, 0.0))
+    end
+
+    while !isempty(currently_infected) && n_sampled < S_max
 
         update_event_rates!(event_rates, model, S, E, I)
         total_event_rate = sum(event_rates)
@@ -53,27 +68,35 @@ function simulate_chain(model::SEIRModel;
         t -= log(rand_number) / total_event_rate
 
         if rand_number ≤ event_rates[1] / total_event_rate
-            # Infection event
+            # Infection event (S -> E)
             S -= 1
             E += 1
             n_cumulative += 1
-            infection!(chain, sample(infected), t)
-            push!(exposed, n_cumulative)
+            infectee = n_cumulative         # Label infected individuals sequentially
+            
+            # Get a random infector from the infected pool
+            infector = sample(currently_infected)
+            transmission!(events, infector, infectee, t)
+            push!(currently_exposed, infectee)
         elseif rand_number ≤ (event_rates[1] + event_rates[2]) / total_event_rate
-            # Activation event
+            # Activation event (E -> I)
             E -= 1
             I += 1
-            push!(infected, pop_random!(exposed))
+            activated = pop_random!(currently_exposed)
+            activation!(events, activated, t)
+            push!(currently_infected, activated)
         elseif rand_number ≤ (event_rates[1] + event_rates[2] + event_rates[3]) / total_event_rate
             # Recovery event
             I -= 1
-            pop_random!(infected)
+            recovered = pop_random!(currently_infected)
+            recovery!(events, recovered, t)
         else
             # Sampling event
             I -= 1
+            sampled = pop_random!(currently_infected)
+            sampling!(events, sampled, t)
             n_sampled += 1
-            sampling!(chain, pop_random!(infected), t)
         end
     end
-    return chain
+    return events
 end
