@@ -21,7 +21,8 @@ end
 end
 
 
-function simulate_outbreak(model::SIRModel; 
+function simulate_outbreak(rng::AbstractRNG,
+                           model::SIRModel; 
                            S_init::Int=9999, 
                            I_init::Int=1,
                            S_max::Int=100)
@@ -50,7 +51,7 @@ function simulate_outbreak(model::SIRModel;
         update_event_rates!(event_rates, model, S, I)
         total_event_rate = sum(event_rates)
 
-        rand_number = rand()
+        rand_number = rand(rng)
         t -= log(rand_number) / total_event_rate
 
         if rand_number ≤ event_rates[1] / total_event_rate
@@ -61,21 +62,29 @@ function simulate_outbreak(model::SIRModel;
             infectee = n_cumulative
             
             # Get a random infector from the infected pool
-            infector = sample(currently_infected)
+            infector = sample(rng, currently_infected)
             transmission!(events, infector, infectee, t)
             push!(currently_infected, infectee)
         elseif rand_number ≤ (event_rates[1] + event_rates[2]) / total_event_rate
             # Recovery event
             I -= 1
-            recovered = pop_random!(currently_infected)
+            recovered = pop_random!(rng, currently_infected)
             recovery!(events, recovered, t)
         else
             # Sampling event
             I -= 1
-            sampled = pop_random!(currently_infected)
+            sampled = pop_random!(rng, currently_infected)
             sampling!(events, sampled, t)
             n_sampled += 1
         end
     end
     return events
+end
+
+
+function simulate_outbreak(model::SIRModel;
+                           S_init::Int=9999,
+                           I_init::Int=1,
+                           S_max::Int=100)
+    return simulate_outbreak(Random.GLOBAL_RNG, model; S_init=S_init, I_init=I_init, S_max=S_max)
 end

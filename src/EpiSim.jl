@@ -9,6 +9,7 @@ using Lazy
 using Parameters
 using Plots
 # using Printf
+using Random
 using RecipesBase
 using RecipesPipeline
 using RecursiveArrayTools

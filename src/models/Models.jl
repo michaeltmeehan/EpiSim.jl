@@ -1,6 +1,6 @@
 module Models
 
-# using ..Transmission
+using Random
 using ..EpiEvent
 import LinearAlgebra: ⋅
 import StatsBase: sample, wsample

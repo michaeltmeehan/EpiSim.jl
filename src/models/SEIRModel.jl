@@ -21,11 +21,12 @@ function update_event_rates!(event_rates::Vector{Float64}, model::SEIRModel, S::
 end
 
 
-function simulate_outbreak(model::SEIRModel;
-                        S_init::Int=9999, 
-                        E_init::Int=0,
-                        I_init::Int=1,
-                        S_max::Int=100)
+function simulate_outbreak(rng::AbstractRNG,
+                           model::SEIRModel;
+                           S_init::Int=9999, 
+                           E_init::Int=0,
+                           I_init::Int=1,
+                           S_max::Int=100)
 
     # Initialize population parameters
     S = S_init
@@ -64,7 +65,7 @@ function simulate_outbreak(model::SEIRModel;
         update_event_rates!(event_rates, model, S, E, I)
         total_event_rate = sum(event_rates)
 
-        rand_number = rand()
+        rand_number = rand(rng)
         t -= log(rand_number) / total_event_rate
 
         if rand_number ≤ event_rates[1] / total_event_rate
@@ -75,28 +76,37 @@ function simulate_outbreak(model::SEIRModel;
             infectee = n_cumulative         # Label infected individuals sequentially
             
             # Get a random infector from the infected pool
-            infector = sample(currently_infected)
+            infector = sample(rng, currently_infected)
             transmission!(events, infector, infectee, t)
             push!(currently_exposed, infectee)
         elseif rand_number ≤ (event_rates[1] + event_rates[2]) / total_event_rate
             # Activation event (E -> I)
             E -= 1
             I += 1
-            activated = pop_random!(currently_exposed)
+            activated = pop_random!(rng, currently_exposed)
             activation!(events, activated, t)
             push!(currently_infected, activated)
         elseif rand_number ≤ (event_rates[1] + event_rates[2] + event_rates[3]) / total_event_rate
             # Recovery event
             I -= 1
-            recovered = pop_random!(currently_infected)
+            recovered = pop_random!(rng, currently_infected)
             recovery!(events, recovered, t)
         else
             # Sampling event
             I -= 1
-            sampled = pop_random!(currently_infected)
+            sampled = pop_random!(rng, currently_infected)
             sampling!(events, sampled, t)
             n_sampled += 1
         end
     end
     return events
+end
+
+
+function simulate_outbreak(model::SEIRModel;
+                           S_init::Int=9999,
+                           E_init::Int=0,
+                           I_init::Int=1,
+                           S_max::Int=100)
+    return simulate_outbreak(Random.GLOBAL_RNG, model; S_init=S_init, E_init=E_init, I_init=I_init, S_max=S_max)
 end

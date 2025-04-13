@@ -28,10 +28,11 @@ function update_event_rates!(event_rates::Vector{Float64}, model::MultiTypeBirth
 end
 
 
-function simulate_outbreak(model::MultiTypeBirthDeathModel;
-                        I_init::Vector{Int}=[1, 0],
-                        N_max::Int=10_000,
-                        S_max::Int=100)
+function simulate_outbreak(rng::AbstractRNG,
+                           model::MultiTypeBirthDeathModel;
+                           I_init::Vector{Int}=[1, 0],
+                           N_max::Int=10_000,
+                           S_max::Int=100)
 
     I = I_init
     n_cumulative = sum(I_init)
@@ -58,34 +59,42 @@ function simulate_outbreak(model::MultiTypeBirthDeathModel;
         update_event_rates!(event_rates, model, I)
         total_event_rate = sum(event_rates)
         
-        rand_number = rand()
+        rand_number = rand(rng)
         t -= log(rand_number) / total_event_rate
 
         if rand_number ≤ event_rates[1] / total_event_rate
             # Birth event
             birth_weights = model.Λ .* I
-            parent_type = wsample(1:model.n_types, birth_weights)
-            child_type = wsample(1:model.n_types, model.birth_rate[parent_type, :])
+            parent_type = wsample(rng, 1:model.n_types, birth_weights)
+            child_type = wsample(rng, 1:model.n_types, model.birth_rate[parent_type, :])
             I[child_type] += 1
             n_cumulative += 1
             infectee = n_cumulative         # Label infected individuals sequentially
-            infector = sample(currently_infected[parent_type])
+            infector = sample(rng, currently_infected[parent_type])
             push!(currently_infected[child_type], infectee)
             transmission!(events, infector, infectee, t)
         elseif rand_number ≤ (event_rates[1] + event_rates[2]) / total_event_rate
             # Death event
-            death_type = wsample(1:model.n_types, I)
+            death_type = wsample(rng, 1:model.n_types, I)
             I[death_type] -= 1
-            recovered = pop_random!(currently_infected[death_type])
+            recovered = pop_random!(rng, currently_infected[death_type])
             recovery!(events, recovered, t)
         else
             # Sampling event
-            sampled_type = wsample(1:model.n_types, I)
+            sampled_type = wsample(rng, 1:model.n_types, I)
             I[sampled_type] -= 1
             n_sampled += 1
-            sampled = pop_random!(currently_infected[sampled_type])
+            sampled = pop_random!(rng, currently_infected[sampled_type])
             sampling!(events, sampled, t)
         end
     end
     return events
+end
+
+
+function simulate_outbreak(model::MultiTypeBirthDeathModel; 
+                           I_init::Vector{Int}=[1, 0],
+                           N_max::Int=10_000, 
+                           S_max::Int=100)
+    return simulate_outbreak(Random.GLOBAL_RNG, model, I_init=I_init, N_max=N_max, S_max=S_max)
 end

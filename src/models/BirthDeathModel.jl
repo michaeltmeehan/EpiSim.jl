@@ -16,7 +16,8 @@ function update_event_rates!(event_rates::Vector{Float64}, model::BirthDeathMode
 end
 
 
-function simulate_outbreak(model::BirthDeathModel;
+function simulate_outbreak(rng::AbstractRNG,
+                           model::BirthDeathModel;
                            N_max::Int=10_000, 
                            t_max::Float64=100.0, 
                            S_max::Int=100, 
@@ -42,7 +43,7 @@ function simulate_outbreak(model::BirthDeathModel;
     t = 0.0
 
     while !isempty(currently_infected) && n_cumulative < N_max && n_sampled < S_max
-        rand_number = rand()
+        rand_number = rand(rng)
         t -= log(rand_number) / (total_event_rate * I)
         t > t_max && break
 
@@ -51,21 +52,30 @@ function simulate_outbreak(model::BirthDeathModel;
             I += 1
             n_cumulative += 1
             infectee = n_cumulative         # Label infected individuals sequentially
-            infector = sample(currently_infected)
+            infector = sample(rng, currently_infected)
             push!(currently_infected, infectee)
             transmission!(events, infector, infectee, t)
         elseif rand_number ≤ (event_rates[1] + event_rates[2]) / total_event_rate
             # Death event
             I -= 1
-            recovered = pop_random!(currently_infected)
+            recovered = pop_random!(rng, currently_infected)
             recovery!(events, recovered, t)
         else
             # Sampling event
             I -= 1
             n_sampled += 1
-            sampled = pop_random!(currently_infected)
+            sampled = pop_random!(rng, currently_infected)
             sampling!(events, sampled, t)
         end
     end
     return events
+end
+
+
+function simulate_outbreak(model::BirthDeathModel;
+                           N_max::Int=10_000, 
+                           t_max::Float64=100.0, 
+                           S_max::Int=100, 
+                           I_init::Int=1)
+    return simulate_outbreak(Random.GLOBAL_RNG, model; N_max=N_max, t_max=t_max, S_max=S_max, I_init=I_init)
 end
