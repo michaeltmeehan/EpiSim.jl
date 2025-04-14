@@ -36,7 +36,7 @@ function simulate_outbreak(rng::AbstractRNG,
     n_sampled = 0
     currently_infected = collect(1:I_init)
 
-    events = Vector{AbstractEpiEvent}()
+    events = Vector{SIREvent}()
     event_rates = Vector{Float64}(undef, 3)
     
     t = 0.0

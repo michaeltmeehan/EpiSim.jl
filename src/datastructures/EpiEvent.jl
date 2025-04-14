@@ -37,7 +37,7 @@ struct Transmission <: AbstractEpiEvent
 end
 
 
-function transmission!(events::Vector{AbstractEpiEvent}, infector::Int, infectee::Int, time::Float64)
+function transmission!(events::Vector{T}, infector::Int, infectee::Int, time::Float64) where T <: AbstractEpiEvent
     push!(events, Transmission(infector, infectee, time))
 end
 
@@ -48,7 +48,7 @@ struct Sampling <: AbstractEpiEvent
 end
 
 
-function sampling!(events::Vector{AbstractEpiEvent}, sampled::Int, time::Float64)
+function sampling!(events::Vector{T}, sampled::Int, time::Float64) where T <: AbstractEpiEvent
     push!(events, Sampling(sampled, time))
 end
 
@@ -59,7 +59,7 @@ struct Recovery <: AbstractEpiEvent
 end
 
 
-function recovery!(events::Vector{AbstractEpiEvent}, recovered::Int, time::Float64)
+function recovery!(events::Vector{T}, recovered::Int, time::Float64) where T <: AbstractEpiEvent
     push!(events, Recovery(recovered, time))
 end
 
@@ -154,7 +154,7 @@ function Base.show(io::IO, ::MIME"text/plain", events::Vector{<:AbstractEpiEvent
     println()
 
     # Draw incidence
-    draw_log_incidence(io, events; bin_width=1.0, t_start=t_min, t_stop=t_max, max_width=60)
+    ninfected > 0 && draw_log_incidence(io, events; bin_width=1.0, t_start=t_min, t_stop=t_max, max_width=60)
 
     # Show tail
     println(io, "\n  Last 5 events:")
