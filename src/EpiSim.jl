@@ -36,4 +36,8 @@ export simulate_outbreak
 
 # export TransmissionTree, extract_sampled_tree
 
+include("simulation/gillespie.jl")
+
+export gillespie
+
 end # module EpiSim

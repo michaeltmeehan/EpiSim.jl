@@ -6,6 +6,90 @@ struct SIRModel <: AbstractEpiModel
 end
 
 
+const SIR_EVENT_TYPES = [Transmission, Recovery, Sampling]
+
+const SIREvent = Union{Seed, SIR_EVENT_TYPES...}
+
+get_event_types(model::SIRModel) = SIR_EVENT_TYPES
+
+
+mutable struct SIRState <: AbstractEpiState
+    t::Float64
+    S::Int
+    I::Int
+    currently_infected::Vector{Int}
+    n_sampled::Int
+    n_cumulative::Int
+end
+
+
+EpiState(model::SIRModel) = SIRState(0.0, model.N - 1, 1, [1], 0, 1)
+
+
+get_default_stop_condition(model::SIRModel) = s -> isempty(s.currently_infected)
+
+
+function initialize_event_log(state::SIRState)::Vector{SIREvent}
+    event_log = Vector{SIREvent}()
+    for i in 1:state.I
+        push!(event_log, Seed(i, 0.0))
+    end
+    return event_log
+end
+
+
+@inline function update_event_rates!(event_rates::Vector{Float64}, 
+                                     model::SIRModel, 
+                                     state::SIRState)
+    β = model.transmission_rate
+    γ = model.recovery_rate
+    ψ = model.sampling_rate
+    N = model.N
+
+    S = state.S
+    I = state.I
+
+    event_rates[1] = β * I * S / N  # Infection rate
+    event_rates[2] = γ * I        # Recovery rate
+    event_rates[3] = ψ * I        # Sampling rate
+end
+
+
+function update_state!(rng::AbstractRNG,
+                       state::SIRState, 
+                       ::Type{Transmission})::Transmission
+    # Update state for Transmission event
+    state.S -= 1
+    state.I += 1
+    state.n_cumulative += 1
+    infectee = state.n_cumulative         # Label infected individuals sequentially
+    infector = sample(rng, state.currently_infected)
+    push!(state.currently_infected, infectee)
+    return Transmission(infector, infectee, state.t)
+end
+
+
+function update_state!(rng::AbstractRNG,
+                       state::SIRState, 
+                       ::Type{Recovery})::Recovery
+    # Update state for Recovery event
+    state.I -= 1
+    recovered = pop_random!(rng, state.currently_infected)
+    return Recovery(recovered, state.t)
+end
+
+
+function update_state!(rng::AbstractRNG,
+                       state::SIRState, 
+                       ::Type{Sampling})::Sampling
+    # Update state for Sampling event
+    state.I -= 1
+    sampled = pop_random!(rng, state.currently_infected)
+    state.n_sampled += 1
+    return Sampling(sampled, state.t)
+end
+
+
 @inline function update_event_rates!(event_rates::Vector{Float64}, 
                                      model::SIRModel, 
                                      S::Int, 

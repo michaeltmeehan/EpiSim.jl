@@ -16,7 +16,12 @@ include("MultiTypeBirthDeathModel.jl")
 export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel
 export simulate_outbreak
 
-include("Gillespie.jl")
+# include("Gillespie.jl")
+
+export AbstractEpiModel, AbstractEpiState
+
+export SIRState
+export EpiState, get_event_types, get_default_stop_condition, initialize_event_log, update_event_rates!, update_state!
 
 
 end
