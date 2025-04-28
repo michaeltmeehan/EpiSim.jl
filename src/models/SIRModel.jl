@@ -23,6 +23,23 @@ mutable struct SIRState <: AbstractEpiState
 end
 
 
+function validate_state(state::SIRState)
+    VALIDATE_STATE || return
+    @assert state.S >= 0 "Susceptible individuals cannot be negative."
+    @assert state.I >= 0 "Infected individuals cannot be negative."
+    @assert state.n_sampled >= 0 "Sampled individuals cannot be negative."
+    @assert state.n_cumulative >= 0 "Cumulative infected individuals cannot be negative."
+    @assert state.t >= 0 "Time cannot be negative."
+    # for i in state.currently_infected
+    #     @assert i ≥ 0 "Currently infected individuals cannot be negative."
+    #     @assert i ≤ state.n_cumulative "Currently infected individuals cannot exceed cumulative count."
+    # end
+    # @assert all(state.currently_infected .≥ 0) "Currently infected individuals cannot be negative."
+    # @assert all(state.currently_infected .<= state.n_cumulative) "Currently infected individuals cannot exceed cumulative infected individuals."
+    @assert state.I == length(state.currently_infected) "Number of currently infected individuals does not match the length of the currently infected vector."
+end
+
+
 EpiState(model::SIRModel) = SIRState(0.0, model.N - 1, 1, [1], 0, 1)
 
 
@@ -55,7 +72,7 @@ end
 end
 
 
-function update_state!(rng::AbstractRNG,
+@inline function update_state!(rng::AbstractRNG,
                        state::SIRState, 
                        ::Type{Transmission})::Transmission
     # Update state for Transmission event
@@ -65,27 +82,30 @@ function update_state!(rng::AbstractRNG,
     infectee = state.n_cumulative         # Label infected individuals sequentially
     infector = sample(rng, state.currently_infected)
     push!(state.currently_infected, infectee)
+    validate_state(state)
     return Transmission(infector, infectee, state.t)
 end
 
 
-function update_state!(rng::AbstractRNG,
+@inline function update_state!(rng::AbstractRNG,
                        state::SIRState, 
                        ::Type{Recovery})::Recovery
     # Update state for Recovery event
     state.I -= 1
     recovered = pop_random!(rng, state.currently_infected)
+    validate_state(state)
     return Recovery(recovered, state.t)
 end
 
 
-function update_state!(rng::AbstractRNG,
+@inline function update_state!(rng::AbstractRNG,
                        state::SIRState, 
                        ::Type{Sampling})::Sampling
     # Update state for Sampling event
     state.I -= 1
     sampled = pop_random!(rng, state.currently_infected)
     state.n_sampled += 1
+    validate_state(state)
     return Sampling(sampled, state.t)
 end
 

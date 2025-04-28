@@ -6,6 +6,8 @@ import LinearAlgebra: ⋅
 import StatsBase: sample, wsample
 using ..EpiSim: pop_random!
 
+VALIDATE_STATE = false
+
 include("AbstractEpiModel.jl")
 include("AbstractEpiState.jl")
 include("SIRModel.jl")
@@ -16,7 +18,6 @@ include("MultiTypeBirthDeathModel.jl")
 export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel
 export simulate_outbreak
 
-# include("Gillespie.jl")
 
 export AbstractEpiModel, AbstractEpiState
 

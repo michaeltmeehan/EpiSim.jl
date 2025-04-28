@@ -30,11 +30,6 @@ using .Models
 export Models
 export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel
 export simulate_outbreak
-# export SIRModel, SEIRModel, BirthDeathModel, MultiTypeBirthDeathModel
-
-# include("Trees/TransmissionTree.jl")
-
-# export TransmissionTree, extract_sampled_tree
 
 include("simulation/gillespie.jl")
 
