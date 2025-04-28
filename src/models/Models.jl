@@ -14,8 +14,9 @@ include("SIRModel.jl")
 include("SEIRModel.jl")
 include("BirthDeathModel.jl")
 include("MultiTypeBirthDeathModel.jl")
+include("SuperSpreaderModel.jl")
 
-export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel
+export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel, SuperSpreaderModel
 export simulate_outbreak
 
 

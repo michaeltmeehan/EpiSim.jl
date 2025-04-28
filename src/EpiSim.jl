@@ -28,7 +28,7 @@ include("models/Models.jl")
 using .Models
 
 export Models
-export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel
+export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel, SuperSpreaderModel
 export simulate_outbreak
 
 include("simulation/gillespie.jl")
