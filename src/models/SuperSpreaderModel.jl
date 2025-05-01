@@ -20,7 +20,7 @@ end
 
 const SuperSpreader_EVENT_TYPES = [Transmission, Recovery, Sampling]
 
-const SuperSpreaderEvent = Union{Seed, BirthDeath_EVENT_TYPES...}
+const SuperSpreaderEvent = Union{Seed, SuperSpreader_EVENT_TYPES...}
 
 get_event_types(model::SuperSpreaderModel) = SuperSpreader_EVENT_TYPES
 

@@ -17,6 +17,95 @@ function MultiTypeBirthDeathModel(birth_rate::Matrix{Float64},
 end
 
 
+const MultiTypeBirthDeath_EVENT_TYPES = [Transmission, Recovery, Sampling]
+
+const MultiTypeBirthDeathEvent = Union{Seed, MultiTypeBirthDeath_EVENT_TYPES...}
+
+get_event_types(model::MultiTypeBirthDeathModel) = MultiTypeBirthDeath_EVENT_TYPES
+
+
+mutable struct MultiTypeBirthDeathState <: AbstractEpiState
+    t::Float64
+    I::Vector{Int}
+    currently_infected::Vector{Vector{Int}}
+    n_sampled::Int
+    n_cumulative::Int
+end
+
+
+EpiState(model::MultiTypeBirthDeathModel) = MultiTypeBirthDeathState(0.0, [1, 0], [[1], []], 0, 1)
+
+get_default_stop_condition(model::MultiTypeBirthDeathModel) = s -> all(isempty.(s.currently_infected)) || s.n_cumulative >= 10_000 || s.n_sampled >= 100 || s.t >= 100.0
+
+
+function initialize_event_log(state::MultiTypeBirthDeathState)::Vector{MultiTypeBirthDeathEvent}
+    event_log = Vector{MultiTypeBirthDeathEvent}()
+    for i in 1:state.n_cumulative
+        push!(event_log, Seed(i, 0.0))
+    end
+    return event_log
+end
+
+
+@inline function update_event_rates!(event_rates::Vector{Float64}, 
+                                     model::MultiTypeBirthDeathModel, 
+                                     state::MultiTypeBirthDeathState)
+    Λ = model.Λ
+    μ = model.death_rate
+    ψ = model.sampling_rate
+    I = state.I
+
+    event_rates[1] = Λ ⋅ I # Infection rate
+    event_rates[2] = μ ⋅ I # Recovery rate
+    event_rates[3] = ψ ⋅ I # Sampling rate
+end
+
+
+@inline function update_state!(rng::AbstractRNG,
+                               model::MultiTypeBirthDeathModel,
+                               state::MultiTypeBirthDeathState, 
+                               ::Type{Transmission})::Transmission
+
+    # Transmission event
+    transmission_weights = model.Λ .* state.I
+    parent_type = wsample(rng, 1:model.n_types, transmission_weights)
+    child_type = wsample(rng, 1:model.n_types, model.Λ[parent_type, :])
+    state.I[child_type] += 1
+    state.n_cumulative += 1
+    infectee = state.n_cumulative         # Label infected individuals sequentially
+    infector = sample(rng, state.currently_infected[parent_type])
+    push!(state.currently_infected[child_type], infectee)
+    Transmission(infector, infectee, state.t)
+end
+
+
+@inline function update_state!(rng::AbstractRNG,
+                               model::MultiTypeBirthDeathModel,
+                               state::MultiTypeBirthDeathState, 
+                               ::Type{Recovery})::Recovery
+    # Recovery event
+    recovery_weights = model.death_rate .* state.I
+    recovery_type = wsample(rng, 1:model.n_types, recovery_weights)
+    state.I[recovery_type] -= 1
+    recovered = pop_random!(rng, state.currently_infected[recovery_type])
+    return Recovery(recovered, state.t)
+end
+
+
+@inline function update_state!(rng::AbstractRNG,
+                               model::MultiTypeBirthDeathModel,
+                               state::MultiTypeBirthDeathState, 
+                               ::Type{Sampling})::Sampling
+    # Sampling event
+    sampling_weights = model.sampling_rate .* state.I
+    sampled_type = wsample(rng, 1:model.n_types, sampling_weights)
+    state.I[sampled_type] -= 1
+    state.n_sampled += 1
+    sampled = pop_random!(rng, state.currently_infected[sampled_type])
+    return Sampling(sampled, state.t)
+end
+
+
 function update_event_rates!(event_rates::Vector{Float64}, model::MultiTypeBirthDeathModel, I::Vector{Int})
     Λ = model.Λ
     μ = model.death_rate
