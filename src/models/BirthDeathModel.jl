@@ -39,7 +39,7 @@ end
 EpiState(model::BirthDeathModel) = BirthDeathState(0.0, 1, [1], 0, 1)
 
 
-get_default_stop_condition(model::BirthDeathModel) = s -> isempty(s.currently_infected)
+get_default_stop_condition(model::BirthDeathModel) = s -> isempty(s.currently_infected) || s.n_cumulative >= 10_000 || s.n_sampled >= 100 || s.t >= 100.0
 
 
 function initialize_event_log(state::BirthDeathState)::Vector{BirthDeathEvent}
@@ -67,6 +67,7 @@ end
 
 
 @inline function update_state!(rng::AbstractRNG,
+                               model::BirthDeathModel,
                                state::BirthDeathState, 
                                ::Type{Transmission})::Transmission
     # Update state for Transmission event
@@ -81,6 +82,7 @@ end
 
 
 @inline function update_state!(rng::AbstractRNG,
+                               model::BirthDeathModel,
                                state::BirthDeathState, 
                                ::Type{Recovery})::Recovery
     # Update state for Recovery event
@@ -92,6 +94,7 @@ end
 
 
 @inline function update_state!(rng::AbstractRNG,
+                               model::BirthDeathModel,
                                state::BirthDeathState, 
                                ::Type{Sampling})::Sampling
     # Update state for Sampling event
@@ -115,12 +118,12 @@ function update_event_rates!(event_rates::Vector{Float64}, model::BirthDeathMode
 end
 
 
-function simulate_outbreak(rng::AbstractRNG,
-                           model::BirthDeathModel;
-                           N_max::Int=10_000, 
-                           t_max::Float64=100.0, 
-                           S_max::Int=100, 
-                           I_init::Int=1)
+function simulate_events(rng::AbstractRNG,
+                         model::BirthDeathModel;
+                         N_max::Int=10_000, 
+                         t_max::Float64=100.0, 
+                         S_max::Int=100, 
+                         I_init::Int=1)
 
     I = I_init
     n_cumulative = I_init
@@ -171,10 +174,10 @@ function simulate_outbreak(rng::AbstractRNG,
 end
 
 
-function simulate_outbreak(model::BirthDeathModel;
+function simulate_events(model::BirthDeathModel;
                            N_max::Int=10_000, 
                            t_max::Float64=100.0, 
                            S_max::Int=100, 
                            I_init::Int=1)
-    return simulate_outbreak(Random.GLOBAL_RNG, model; N_max=N_max, t_max=t_max, S_max=S_max, I_init=I_init)
+    return simulate_events(Random.GLOBAL_RNG, model; N_max=N_max, t_max=t_max, S_max=S_max, I_init=I_init)
 end

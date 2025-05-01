@@ -73,8 +73,9 @@ end
 
 
 @inline function update_state!(rng::AbstractRNG,
-                       state::SIRState, 
-                       ::Type{Transmission})::Transmission
+                               model::SIRModel,
+                               state::SIRState, 
+                               ::Type{Transmission})::Transmission
     # Update state for Transmission event
     state.S -= 1
     state.I += 1
@@ -88,8 +89,9 @@ end
 
 
 @inline function update_state!(rng::AbstractRNG,
-                       state::SIRState, 
-                       ::Type{Recovery})::Recovery
+                               model::SIRModel,
+                               state::SIRState, 
+                               ::Type{Recovery})::Recovery
     # Update state for Recovery event
     state.I -= 1
     recovered = pop_random!(rng, state.currently_infected)
@@ -99,8 +101,9 @@ end
 
 
 @inline function update_state!(rng::AbstractRNG,
-                       state::SIRState, 
-                       ::Type{Sampling})::Sampling
+                               model::SIRModel,
+                               state::SIRState, 
+                               ::Type{Sampling})::Sampling
     # Update state for Sampling event
     state.I -= 1
     sampled = pop_random!(rng, state.currently_infected)
@@ -125,7 +128,7 @@ end
 end
 
 
-function simulate_outbreak(rng::AbstractRNG,
+function simulate_events(rng::AbstractRNG,
                            model::SIRModel; 
                            S_init::Int=9999, 
                            I_init::Int=1,
@@ -186,9 +189,9 @@ function simulate_outbreak(rng::AbstractRNG,
 end
 
 
-function simulate_outbreak(model::SIRModel;
+function simulate_events(model::SIRModel;
                            S_init::Int=9999,
                            I_init::Int=1,
                            S_max::Int=100)
-    return simulate_outbreak(Random.GLOBAL_RNG, model; S_init=S_init, I_init=I_init, S_max=S_max)
+    return simulate_events(Random.GLOBAL_RNG, model; S_init=S_init, I_init=I_init, S_max=S_max)
 end

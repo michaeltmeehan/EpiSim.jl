@@ -29,7 +29,7 @@ using .Models
 
 export Models
 export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel, SuperSpreaderModel
-export simulate_outbreak
+export simulate_events
 
 include("simulation/gillespie.jl")
 

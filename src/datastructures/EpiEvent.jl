@@ -8,7 +8,7 @@ using StatsBase
 using RecipesBase
 using Plots
 
-export Seed, Transmission, Sampling, Recovery, AbstractEpiEvent
+export Seed, Transmission, Activation, Sampling, Recovery, AbstractEpiEvent
 export incidence
 export transmission!, sampling!, recovery!, activation!, get_sampled_events
 
@@ -141,26 +141,30 @@ function Base.show(io::IO, ::MIME"text/plain", events::Vector{<:AbstractEpiEvent
     times = time.(sorted)
     t_min, t_max = minimum(times), maximum(times)
 
-    ninfected = count(e -> e isa Transmission, events)
+    nseed = count(e -> e isa Seed, events)
+    ntransmission = count(e -> e isa Transmission, events)
+    nactivated = count(e -> e isa Activation, events)
     nsampled  = count(e -> e isa Sampling, events)
     nrecovered = count(e -> e isa Recovery, events)
 
     println(io, Crayon(bold=true)("Epidemic Event Log Summary"))
     println(io, "  Total events:    $nevents")
-    println(io, TRANSMISSION_COLOR("  Transmissions:   $ninfected"))
-    println(io, SAMPLING_COLOR("  Samplings:       $nsampled"))
-    println(io, RECOVERY_COLOR("  Recoveries:      $nrecovered"))
-    println(io, "  Time range:      $(round(t_min, digits=2)) to $(round(t_max, digits=2))")
-    println()
+    nseed > 0 && println(io, SEED_COLOR("  Seeds:           $nseed"))
+    ntransmission > 0 && println(io, TRANSMISSION_COLOR("  Transmissions:   $ntransmission"))
+    nactivated > 0 && println(io, ACTIVATION_COLOR("  Activations:     $nactivated"))
+    nsampled > 0 && println(io, SAMPLING_COLOR("  Samplings:       $nsampled"))
+    nrecovered > 0 && println(io, RECOVERY_COLOR("  Recoveries:      $nrecovered"))
+    print(io, "  Time range:      $(round(t_min, digits=2)) to $(round(t_max, digits=2))")
+    # println()
 
     # Draw incidence
-    ninfected > 0 && draw_log_incidence(io, events; bin_width=1.0, t_start=t_min, t_stop=t_max, max_width=60)
+    # ninfected > 0 && draw_log_incidence(io, events; bin_width=1.0, t_start=t_min, t_stop=t_max, max_width=60)
 
     # Show tail
-    println(io, "\n  Last 5 events:")
-    for e in last(sorted, min(5, nevents))
-        println(io, "    ", e)
-    end
+    # println(io, "\n  Last 5 events:")
+    # for e in last(sorted, min(5, nevents))
+    #     println(io, "    ", e)
+    # end
 end
 
 

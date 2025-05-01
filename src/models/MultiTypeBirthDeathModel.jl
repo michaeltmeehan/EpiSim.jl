@@ -28,7 +28,7 @@ function update_event_rates!(event_rates::Vector{Float64}, model::MultiTypeBirth
 end
 
 
-function simulate_outbreak(rng::AbstractRNG,
+function simulate_events(rng::AbstractRNG,
                            model::MultiTypeBirthDeathModel;
                            I_init::Vector{Int}=[1, 0],
                            N_max::Int=10_000,
@@ -92,9 +92,9 @@ function simulate_outbreak(rng::AbstractRNG,
 end
 
 
-function simulate_outbreak(model::MultiTypeBirthDeathModel; 
+function simulate_events(model::MultiTypeBirthDeathModel; 
                            I_init::Vector{Int}=[1, 0],
                            N_max::Int=10_000, 
                            S_max::Int=100)
-    return simulate_outbreak(Random.GLOBAL_RNG, model, I_init=I_init, N_max=N_max, S_max=S_max)
+    return simulate_events(Random.GLOBAL_RNG, model, I_init=I_init, N_max=N_max, S_max=S_max)
 end

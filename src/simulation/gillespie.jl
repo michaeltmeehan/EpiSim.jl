@@ -41,7 +41,7 @@ function gillespie(rng::AbstractRNG,
         event_type = sample_event_type(rand_number, event_types, event_rates, total_event_rate)
 
         # Update model state and extract concrete event record (e.g., Transmission(1, 2, 1.0))
-        event = update_state!(rng, state, event_type)
+        event = update_state!(rng, model, state, event_type)
 
         # Update event log
         push!(event_log, event)

@@ -18,7 +18,96 @@ function SuperSpreaderModel(total_R0::Float64,
 end
 
 
-function update_event_rates!(event_rates::Vector{Float64},
+const SuperSpreader_EVENT_TYPES = [Transmission, Recovery, Sampling]
+
+const SuperSpreaderEvent = Union{Seed, BirthDeath_EVENT_TYPES...}
+
+get_event_types(model::SuperSpreaderModel) = SuperSpreader_EVENT_TYPES
+
+
+mutable struct SuperSpreaderState <: AbstractEpiState
+    t::Float64
+    I::Vector{Int}
+    currently_infected::Vector{Vector{Int}}
+    n_sampled::Int
+    n_cumulative::Int
+end
+
+
+EpiState(model::SuperSpreaderModel) = SuperSpreaderState(0.0, [0, 1], [[], [1]], 0, 1)
+
+get_default_stop_condition(model::SuperSpreaderModel) = s -> all(isempty.(s.currently_infected)) || s.n_cumulative >= 10_000 || s.n_sampled >= 100 || s.t >= 100.0
+
+
+function initialize_event_log(state::SuperSpreaderState)::Vector{SuperSpreaderEvent}
+    event_log = Vector{SuperSpreaderEvent}()
+    for i in 1:state.n_cumulative
+        push!(event_log, Seed(i, 0.0))
+    end
+    return event_log
+end
+
+
+@inline function update_event_rates!(event_rates::Vector{Float64}, 
+                                     model::SuperSpreaderModel, 
+                                     state::SuperSpreaderState)
+    λ = model.transmission_rate
+    μ = model.recovery_rate
+    ψ = model.sampling_rate
+    I = state.I
+
+    event_rates[1] = λ ⋅ I # Infection rate
+    event_rates[2] = μ ⋅ I # Recovery rate
+    event_rates[3] = ψ ⋅ I # Sampling rate
+end
+
+
+@inline function update_state!(rng::AbstractRNG,
+                               model::SuperSpreaderModel,
+                               state::SuperSpreaderState, 
+                               ::Type{Transmission})::Transmission
+
+    # Transmission event
+    transmission_weights = model.transmission_rate .* state.I
+    parent_type = wsample(rng, 1:2, transmission_weights)
+    child_type = wsample(rng, 1:2, model.transmission_rate[parent_type, :])
+    state.I[child_type] += 1
+    state.n_cumulative += 1
+    infectee = state.n_cumulative         # Label infected individuals sequentially
+    infector = sample(rng, state.currently_infected[parent_type])
+    push!(state.currently_infected[child_type], infectee)
+    Transmission(infector, infectee, state.t)
+end
+
+
+@inline function update_state!(rng::AbstractRNG,
+                               model::SuperSpreaderModel,
+                               state::SuperSpreaderState, 
+                               ::Type{Recovery})::Recovery
+    # Recovery event
+    recovery_weights = model.recovery_rate .* state.I
+    recovery_type = wsample(rng, 1:2, recovery_weights)
+    state.I[recovery_type] -= 1
+    recovered = pop_random!(rng, state.currently_infected[recovery_type])
+    return Recovery(recovered, state.t)
+end
+
+
+@inline function update_state!(rng::AbstractRNG,
+                               model::SuperSpreaderModel,
+                               state::SuperSpreaderState, 
+                               ::Type{Sampling})::Sampling
+    # Sampling event
+    sampling_weights = model.sampling_rate .* state.I
+    sampled_type = wsample(rng, 1:2, sampling_weights)
+    state.I[sampled_type] -= 1
+    state.n_sampled += 1
+    sampled = pop_random!(rng, state.currently_infected[sampled_type])
+    return Sampling(sampled, state.t)
+end
+
+
+@inline function update_event_rates!(event_rates::Vector{Float64},
                              model::SuperSpreaderModel,
                              I::Vector{Int})
     # Update event rates for the SuperSpreaderModel
@@ -33,7 +122,7 @@ function update_event_rates!(event_rates::Vector{Float64},
 end
 
 
-function simulate_outbreak(rng::AbstractRNG,
+function simulate_events(rng::AbstractRNG,
                            model::SuperSpreaderModel;
                            I_init::Vector{Int}=[1, 0],
                            N_max::Int=10_000,
@@ -99,9 +188,9 @@ function simulate_outbreak(rng::AbstractRNG,
 end
 
 
-function simulate_outbreak(model::SuperSpreaderModel; 
+function simulate_events(model::SuperSpreaderModel; 
                            I_init::Vector{Int}=[1, 0],
                            N_max::Int=10_000, 
                            S_max::Int=100)
-    return simulate_outbreak(Random.GLOBAL_RNG, model, I_init=I_init, N_max=N_max, S_max=S_max)
+    return simulate_events(Random.GLOBAL_RNG, model, I_init=I_init, N_max=N_max, S_max=S_max)
 end
