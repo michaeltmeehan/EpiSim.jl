@@ -27,6 +27,7 @@ UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 [compat]
 ColorSchemes = "3.29.0"
 Crayons = "4.1.1"
+DataFrames = "1.7.0"
 LinearAlgebra = "1.11.0"
 Printf = "1.11.0"
 Random = "1.11.0"

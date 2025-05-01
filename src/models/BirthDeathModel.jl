@@ -20,6 +20,14 @@ mutable struct BirthDeathState <: AbstractEpiState
 end
 
 
+struct BirthDeathStateSlice <: AbstractEpiStateSlice
+    t::Float64
+    I::Int
+end
+
+slice(state::BirthDeathState)::BirthDeathStateSlice = BirthDeathStateSlice(state.t, state.I)
+
+
 function validate_state(state::BirthDeathState)
     VALIDATE_STATE || return
     @assert state.I >= 0 "Infected individuals cannot be negative."

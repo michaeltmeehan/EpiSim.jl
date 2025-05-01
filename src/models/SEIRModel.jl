@@ -26,6 +26,15 @@ mutable struct SEIRState <: AbstractEpiState
 end
 
 
+struct SEIRStateSlice <: AbstractEpiStateSlice
+    t::Float64
+    S::Int
+    E::Int
+    I::Int
+end
+
+slice(state::SEIRState)::SEIRStateSlice = SEIRStateSlice(state.t, state.S, state.E, state.I)
+
 EpiState(model::SEIRModel) = SEIRState(0.0, model.N - 1, 0, 1, [], [1], 0, 1)
 
 

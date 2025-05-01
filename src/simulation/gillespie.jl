@@ -24,7 +24,7 @@ function gillespie(rng::AbstractRNG,
     event_log = initialize_event_log(state)
     event_rates = Vector{Float64}(undef, length(event_types))
 
-    state_log = [state]
+    state_log = [slice(state)]
 
     # Main simulation loop
     while !stop_condition(state)
@@ -49,7 +49,7 @@ function gillespie(rng::AbstractRNG,
         push!(event_log, event)
 
         # Update state log
-        push!(state_log, state)
+        push!(state_log, slice(state))
 
     end
     return event_log, state_log

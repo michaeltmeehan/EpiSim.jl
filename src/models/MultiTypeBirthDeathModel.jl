@@ -33,6 +33,15 @@ mutable struct MultiTypeBirthDeathState <: AbstractEpiState
 end
 
 
+struct MultiTypeBirthDeathStateSlice <: AbstractEpiStateSlice
+    t::Float64
+    I::Vector{Int}
+end
+
+
+slice(state::MultiTypeBirthDeathState)::MultiTypeBirthDeathStateSlice = MultiTypeBirthDeathStateSlice(state.t, copy(state.I))
+
+
 EpiState(model::MultiTypeBirthDeathModel) = MultiTypeBirthDeathState(0.0, [1, 0], [[1], []], 0, 1)
 
 get_default_stop_condition(model::MultiTypeBirthDeathModel) = s -> all(isempty.(s.currently_infected)) || s.n_cumulative >= 10_000 || s.n_sampled >= 100 || s.t >= 100.0

@@ -23,6 +23,15 @@ mutable struct SIRState <: AbstractEpiState
 end
 
 
+struct SIRStateSlice <: AbstractEpiStateSlice
+    t::Float64
+    S::Int
+    I::Int
+end
+
+slice(state::SIRState)::SIRStateSlice = SIRStateSlice(state.t, state.S, state.I)
+
+
 function validate_state(state::SIRState)
     VALIDATE_STATE || return
     @assert state.S >= 0 "Susceptible individuals cannot be negative."

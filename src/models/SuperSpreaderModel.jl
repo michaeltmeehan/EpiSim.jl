@@ -34,6 +34,16 @@ mutable struct SuperSpreaderState <: AbstractEpiState
 end
 
 
+struct SuperSpreaderStateSlice <: AbstractEpiStateSlice
+    t::Float64
+    I_regular::Int
+    I_super::Int
+end
+
+
+slice(state::SuperSpreaderState)::SuperSpreaderStateSlice = SuperSpreaderStateSlice(state.t, state.I[1], state.I[2])
+
+
 EpiState(model::SuperSpreaderModel) = SuperSpreaderState(0.0, [0, 1], [[], [1]], 0, 1)
 
 get_default_stop_condition(model::SuperSpreaderModel) = s -> all(isempty.(s.currently_infected)) || s.n_cumulative >= 10_000 || s.n_sampled >= 100 || s.t >= 100.0

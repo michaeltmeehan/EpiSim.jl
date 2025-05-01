@@ -1,5 +1,6 @@
 module Models
 
+using DataFrames
 using Random
 using ..EpiEvent
 import LinearAlgebra: ⋅
@@ -16,9 +17,10 @@ include("BirthDeathModel.jl")
 include("MultiTypeBirthDeathModel.jl")
 include("SuperSpreaderModel.jl")
 
-export AbstractEpiModel, AbstractEpiState
+export AbstractEpiModel, AbstractEpiState, AbstractEpiStateSlice
 export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel, SuperSpreaderModel
 export simulate_events
+export slice
 
 
 
