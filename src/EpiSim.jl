@@ -2,6 +2,7 @@ module EpiSim
 
 # using CairoMakie # Experimental
 # using ColorSchemes
+import Base.Threads
 using Crayons
 using DataFrames
 using DataFramesMeta
@@ -33,6 +34,6 @@ export simulate_events
 
 include("simulation/simulate.jl")
 
-export simulate
+export simulate, Outbreak, Ensemble
 
 end # module EpiSim

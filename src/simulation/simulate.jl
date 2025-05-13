@@ -2,12 +2,19 @@ using ..Models
 
 
 abstract type AbstractOutbreak end
-
+abstract type AbstractEnsemble end
 
 struct Outbreak{M<:AbstractEpiModel} <: AbstractOutbreak
     model::M
     state_log::DataFrame
     event_log::Union{Nothing, Vector{AbstractEpiEvent}}
+end
+
+
+struct Ensemble{M<:AbstractEpiModel} <: AbstractEnsemble
+    model::M
+    replicates::Vector{Outbreak{M}}
+    seeds::Vector{Int}
 end
 
 
@@ -64,4 +71,22 @@ function simulate(rng::AbstractRNG,
         push!(state_log, capture(state))
     end
     return Outbreak(model, DataFrame(state_log), event_log)
+end
+
+
+function simulate(rng::AbstractRNG,
+                  model::M,
+                  n::Int;
+                  stop_condition::Function = get_default_stop_condition(model)) where M <: AbstractEpiModel
+
+    if n == 1
+        return simulate(rng, model; stop_condition=stop_condition)
+    else
+        seeds = rand(rng, UInt32(1):UInt32(2^31-1), n)
+        replicates = Vector{Outbreak{M}}(undef, n)
+        Threads.@threads for i in 1:n
+            replicates[i] = simulate(MersenneTwister(seeds[i]), model; stop_condition=stop_condition)
+        end
+        return Ensemble{M}(model, replicates, seeds)
+    end
 end
