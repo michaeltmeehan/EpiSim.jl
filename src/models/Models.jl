@@ -1,6 +1,7 @@
 module Models
 
 using DataFrames
+using Lazy
 using Random
 using ..EpiEvent
 import LinearAlgebra: ⋅

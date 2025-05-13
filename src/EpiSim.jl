@@ -31,7 +31,7 @@ export Models
 export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel, SuperSpreaderModel
 export simulate_events
 
-include("simulation/gillespie.jl")
+include("simulation/simulate.jl")
 
 export simulate
 

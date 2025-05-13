@@ -1,6 +1,16 @@
 using ..Models
 
 
+abstract type AbstractOutbreak end
+
+
+struct Outbreak{M<:AbstractEpiModel} <: AbstractOutbreak
+    model::M
+    state_log::DataFrame
+    event_log::Union{Nothing, Vector{AbstractEpiEvent}}
+end
+
+
 function sample_event_type(rand_number::Float64, 
                            event_types::Vector{DataType}, 
                            event_rates::Vector{Float64}, 
@@ -52,7 +62,6 @@ function simulate(rng::AbstractRNG,
 
         # Update state log
         push!(state_log, capture(state))
-
     end
-    return event_log, state_log
+    return Outbreak(model, DataFrame(state_log), event_log)
 end

@@ -4,6 +4,19 @@ struct BirthDeathParameters <: AbstractEpiParameters
     sampling_rate::Float64
 end
 
+function BirthDeathParameters(; R₀::Float64=2.0, infectious_period::Float64=1.0, sampling_fraction::Float64=0.1)
+    birth_rate = R₀ / infectious_period
+    death_rate = (1.0 - sampling_fraction) / infectious_period
+    sampling_rate = sampling_fraction / infectious_period
+    return BirthDeathParameters(birth_rate, death_rate, sampling_rate)
+end
+
+function summarize(p::BirthDeathParameters)
+    R₀ = p.birth_rate / (p.death_rate + p.sampling_rate)
+    infectious_period = 1 / (p.death_rate + p.sampling_rate)
+    return (;R₀ = R₀, infectious_period = infectious_period)
+end
+
 
 struct BirthDeathModel{S<:AbstractEpiState} <: AbstractEpiModel
     parameters::BirthDeathParameters
@@ -12,13 +25,9 @@ struct BirthDeathModel{S<:AbstractEpiState} <: AbstractEpiModel
 end
 
 
-get_default_stop_condition(model::BirthDeathModel{AgenticBirthDeathState}) = s -> s.n_sampled >= 100
-
-get_default_stop_condition(model::BirthDeathModel{AggregateBirthDeathState}) = s -> s.I == 0 || s.t >= 100.0 || s.I >= 10_000
+@forward BirthDeathModel.parameters summarize
 
 const BIRTHDEATH_EVENT_TYPES = [Transmission, Recovery, Sampling]
-
-const BirthDeathEvent = Union{Seed, BIRTHDEATH_EVENT_TYPES...}
 
 
 mutable struct AgenticBirthDeathState <: AgenticState
@@ -38,10 +47,13 @@ end
 
 capture(state::Union{AgenticBirthDeathState, AggregateBirthDeathState}) = (; t=state.t, I=state.I)
 
+get_default_stop_condition(model::BirthDeathModel{AgenticBirthDeathState}) = s -> s.n_sampled >= 100
+
+get_default_stop_condition(model::BirthDeathModel{AggregateBirthDeathState}) = s -> s.I == 0 || s.t >= 100.0 || s.I >= 10_000
 
 
-function initialize_event_log(state::AgenticBirthDeathState)::Vector{BirthDeathEvent}
-    event_log = Vector{BirthDeathEvent}()
+function initialize_event_log(state::AgenticBirthDeathState)::Vector{AbstractEpiEvent}
+    event_log = Vector{AbstractEpiEvent}()
     for i in 1:state.I
         push!(event_log, Seed(i, 0.0))
     end
@@ -153,7 +165,7 @@ function simulate_events(rng::AbstractRNG,
 
     currently_infected = collect(1:I_init)
 
-    events = Vector{BirthDeathEvent}()
+    events = Vector{Union{Seed, BIRTHDEATH_EVENT_TYPES...}}()
 
     for seed_host in 1:I_init
         push!(events, Seed(seed_host, 0.0))
