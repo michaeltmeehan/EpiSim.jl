@@ -11,15 +11,15 @@ function Base.convert(::Type{DataFrame}, slices::Vector{<:AbstractEpiStateSlice}
     return DataFrame(cols)
 end
 
-
-function Base.convert(::Type{DataFrame}, slices::Vector{MultiTypeBirthDeathStateSlice})
-    n = length(slices[1].I)
-    dct = Dict(:t => getfield.(slices, :t))
-    for i in 1:n                                                                                                                                                   
-        dct[Symbol("I_$i")] = getindex.(getfield.(slices, :I), i)                                                                                                      
-        end
-    return DataFrame(dct)
-end
+# TODO: Implement a more efficient conversion for MultiTypeBirthDeathStateSlice (beware circular dependencies with AbstractEpiState and MultiTypeBirthDeathStateSlice)
+# function Base.convert(::Type{DataFrame}, slices::Vector{MultiTypeBirthDeathStateSlice})
+#     n = length(slices[1].I)
+#     dct = Dict(:t => getfield.(slices, :t))
+#     for i in 1:n                                                                                                                                                   
+#         dct[Symbol("I_$i")] = getindex.(getfield.(slices, :I), i)                                                                                                      
+#         end
+#     return DataFrame(dct)
+# end
 
 
 

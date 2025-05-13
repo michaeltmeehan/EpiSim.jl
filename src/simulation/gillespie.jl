@@ -33,6 +33,8 @@ function gillespie(rng::AbstractRNG,
 
         total_event_rate = sum(event_rates)
 
+        total_event_rate == 0.0 && break
+
         # Generate random number for time step and event selection
         rand_number = rand(rng)
 

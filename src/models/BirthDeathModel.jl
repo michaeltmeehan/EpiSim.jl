@@ -84,7 +84,6 @@ end
     infectee = state.n_cumulative         # Label infected individuals sequentially
     infector = sample(rng, state.currently_infected)
     push!(state.currently_infected, infectee)
-    validate_state(state)
     return Transmission(infector, infectee, state.t)
 end
 
@@ -96,7 +95,6 @@ end
     # Update state for Recovery event
     state.I -= 1
     recovered = pop_random!(rng, state.currently_infected)
-    validate_state(state)
     return Recovery(recovered, state.t)
 end
 
@@ -109,7 +107,6 @@ end
     state.I -= 1
     sampled = pop_random!(rng, state.currently_infected)
     state.n_sampled += 1
-    validate_state(state)
     return Sampling(sampled, state.t)
 end
 
