@@ -33,6 +33,6 @@ export simulate_events
 
 include("simulation/gillespie.jl")
 
-export gillespie
+export simulate
 
 end # module EpiSim

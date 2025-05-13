@@ -20,7 +20,7 @@ include("SuperSpreaderModel.jl")
 export AbstractEpiModel, AbstractEpiState, AbstractEpiStateSlice
 export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel, SuperSpreaderModel
 export simulate_events
-export slice
+export capture, isagentic
 
 
 

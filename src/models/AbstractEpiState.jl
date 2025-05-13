@@ -1,6 +1,10 @@
 abstract type AbstractEpiState end
 
 
+abstract type AgenticState <: AbstractEpiState end
+abstract type AggregateState <: AbstractEpiState end
+
+
 abstract type AbstractEpiStateSlice end
 
 

@@ -1,5 +1,7 @@
 abstract type AbstractEpiModel end
 
+isagentic(model::AbstractEpiModel) = typeof(model.initial_state) <: AgenticState
+
 
 function Base.show(io::IO, model::T) where {T<:AbstractEpiModel}
     println(io, nameof(T))
@@ -14,10 +16,4 @@ end
 
 
 
-
-"""
-    update_event_rates!(event_rates, model, ...)
-
-Update the event rates for the given model.
-Must be implemented for each subtype of `AbstractEpiModel`.
-"""
+abstract type AbstractEpiParameters end

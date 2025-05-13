@@ -15,21 +15,21 @@ function sample_event_type(rand_number::Float64,
 end
 
 
-function gillespie(rng::AbstractRNG,
-                   model::M;
-                   state::S=EpiState(model),
-                   stop_condition::Function=get_default_stop_condition(model)) where {M <: AbstractEpiModel, S <: AbstractEpiState}
+function simulate(rng::AbstractRNG,
+                  model::AbstractEpiModel;
+                  stop_condition::Function=get_default_stop_condition(model))
 
-    event_types = get_event_types(model)
-    event_log = initialize_event_log(state)
+    state = deepcopy(model.initial_state)
+    event_types = model.event_types
+    event_log = isagentic(model) ? initialize_event_log(state) : nothing
     event_rates = Vector{Float64}(undef, length(event_types))
 
-    state_log = [slice(state)]
+    state_log = [capture(state)]
 
     # Main simulation loop
     while !stop_condition(state)
 
-        update_event_rates!(event_rates, model, state)
+        update_event_rates!(event_rates, model.parameters, state)
 
         total_event_rate = sum(event_rates)
 
@@ -45,13 +45,13 @@ function gillespie(rng::AbstractRNG,
         event_type = sample_event_type(rand_number, event_types, event_rates, total_event_rate)
 
         # Update model state and extract concrete event record (e.g., Transmission(1, 2, 1.0))
-        event = update_state!(rng, model, state, event_type)
+        event = update_state!(rng, model.parameters, state, event_type)
 
         # Update event log
-        push!(event_log, event)
+        !isnothing(event) && push!(event_log, event)
 
         # Update state log
-        push!(state_log, slice(state))
+        push!(state_log, capture(state))
 
     end
     return event_log, state_log

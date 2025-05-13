@@ -1,17 +1,27 @@
-struct BirthDeathModel <: AbstractEpiModel
+struct BirthDeathParameters <: AbstractEpiParameters
     birth_rate::Float64
     death_rate::Float64
     sampling_rate::Float64
 end
 
-const BirthDeath_EVENT_TYPES = [Transmission, Recovery, Sampling]
 
-const BirthDeathEvent = Union{Seed, BirthDeath_EVENT_TYPES...}
+struct BirthDeathModel{S<:AbstractEpiState} <: AbstractEpiModel
+    parameters::BirthDeathParameters
+    event_types::Vector{DataType}
+    initial_state::S
+end
 
-get_event_types(model::BirthDeathModel) = BirthDeath_EVENT_TYPES
+
+get_default_stop_condition(model::BirthDeathModel{AgenticBirthDeathState}) = s -> s.n_sampled >= 100
+
+get_default_stop_condition(model::BirthDeathModel{AggregateBirthDeathState}) = s -> s.I == 0 || s.t >= 100.0 || s.I >= 10_000
+
+const BIRTHDEATH_EVENT_TYPES = [Transmission, Recovery, Sampling]
+
+const BirthDeathEvent = Union{Seed, BIRTHDEATH_EVENT_TYPES...}
 
 
-mutable struct BirthDeathState <: AbstractEpiState
+mutable struct AgenticBirthDeathState <: AgenticState
     t::Float64
     I::Int
     currently_infected::Vector{Int}
@@ -20,37 +30,17 @@ mutable struct BirthDeathState <: AbstractEpiState
 end
 
 
-struct BirthDeathStateSlice <: AbstractEpiStateSlice
+mutable struct AggregateBirthDeathState <: AggregateState
     t::Float64
     I::Int
 end
 
-slice(state::BirthDeathState)::BirthDeathStateSlice = BirthDeathStateSlice(state.t, state.I)
+
+capture(state::Union{AgenticBirthDeathState, AggregateBirthDeathState}) = (; t=state.t, I=state.I)
 
 
-function validate_state(state::BirthDeathState)
-    VALIDATE_STATE || return
-    @assert state.I >= 0 "Infected individuals cannot be negative."
-    @assert state.n_sampled >= 0 "Sampled individuals cannot be negative."
-    @assert state.n_cumulative >= 0 "Cumulative infected individuals cannot be negative."
-    @assert state.t >= 0 "Time cannot be negative."
-    # for i in state.currently_infected
-    #     @assert i ≥ 0 "Currently infected individuals cannot be negative."
-    #     @assert i ≤ state.n_cumulative "Currently infected individuals cannot exceed cumulative count."
-    # end
-    # @assert all(state.currently_infected .≥ 0) "Currently infected individuals cannot be negative."
-    # @assert all(state.currently_infected .<= state.n_cumulative) "Currently infected individuals cannot exceed cumulative infected individuals."
-    @assert state.I == length(state.currently_infected) "Number of currently infected individuals does not match the length of the currently infected vector."
-end
 
-
-EpiState(model::BirthDeathModel) = BirthDeathState(0.0, 1, [1], 0, 1)
-
-
-get_default_stop_condition(model::BirthDeathModel) = s -> isempty(s.currently_infected) || s.n_cumulative >= 10_000 || s.n_sampled >= 100 || s.t >= 100.0
-
-
-function initialize_event_log(state::BirthDeathState)::Vector{BirthDeathEvent}
+function initialize_event_log(state::AgenticBirthDeathState)::Vector{BirthDeathEvent}
     event_log = Vector{BirthDeathEvent}()
     for i in 1:state.I
         push!(event_log, Seed(i, 0.0))
@@ -60,11 +50,11 @@ end
 
 
 @inline function update_event_rates!(event_rates::Vector{Float64}, 
-                                     model::BirthDeathModel, 
-                                     state::BirthDeathState)
-    birth_rate = model.birth_rate
-    death_rate = model.death_rate
-    sampling_rate = model.sampling_rate
+                                     parameters::BirthDeathParameters, 
+                                     state::Union{AgenticBirthDeathState, AggregateBirthDeathState})
+    birth_rate = parameters.birth_rate
+    death_rate = parameters.death_rate
+    sampling_rate = parameters.sampling_rate
 
     I = state.I
 
@@ -75,8 +65,17 @@ end
 
 
 @inline function update_state!(rng::AbstractRNG,
-                               model::BirthDeathModel,
-                               state::BirthDeathState, 
+                               parameters::BirthDeathParameters,
+                               state::AggregateBirthDeathState, 
+                               ::Type{Transmission})::Nothing
+    state.I += 1
+    return
+end
+
+
+@inline function update_state!(rng::AbstractRNG,
+                               parameters::BirthDeathParameters,
+                               state::AgenticBirthDeathState, 
                                ::Type{Transmission})::Transmission
     # Update state for Transmission event
     state.I += 1
@@ -89,8 +88,17 @@ end
 
 
 @inline function update_state!(rng::AbstractRNG,
-                               model::BirthDeathModel,
-                               state::BirthDeathState, 
+                               parameters::BirthDeathParameters,
+                               state::AggregateBirthDeathState, 
+                               ::Type{Recovery})::Nothing
+    state.I -= 1
+    return
+end
+
+
+@inline function update_state!(rng::AbstractRNG,
+                               parameters::BirthDeathParameters,
+                               state::AgenticBirthDeathState, 
                                ::Type{Recovery})::Recovery
     # Update state for Recovery event
     state.I -= 1
@@ -100,8 +108,17 @@ end
 
 
 @inline function update_state!(rng::AbstractRNG,
-                               model::BirthDeathModel,
-                               state::BirthDeathState, 
+                               parameters::BirthDeathParameters,
+                               state::AggregateBirthDeathState, 
+                               ::Type{Sampling})::Nothing
+    state.I -= 1
+    return nothing
+end
+
+
+@inline function update_state!(rng::AbstractRNG,
+                               parameters::BirthDeathParameters,
+                               state::AgenticBirthDeathState, 
                                ::Type{Sampling})::Sampling
     # Update state for Sampling event
     state.I -= 1
@@ -112,10 +129,10 @@ end
 
 
 
-function update_event_rates!(event_rates::Vector{Float64}, model::BirthDeathModel)
-    λ = model.birth_rate
-    μ = model.death_rate
-    ψ = model.sampling_rate
+function update_event_rates!(event_rates::Vector{Float64}, parameters::BirthDeathParameters)
+    λ = parameters.birth_rate
+    μ = parameters.death_rate
+    ψ = parameters.sampling_rate
 
     event_rates[1] = λ  # Birth rate
     event_rates[2] = μ  # Death rate
@@ -144,7 +161,7 @@ function simulate_events(rng::AbstractRNG,
 
     # Pre-calculate event rates
     event_rates = Vector{Float64}(undef, 3)
-    update_event_rates!(event_rates, model)
+    update_event_rates!(event_rates, model.parameters)
     total_event_rate = sum(event_rates)
     
     t = 0.0
