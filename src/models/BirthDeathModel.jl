@@ -4,12 +4,21 @@ struct BirthDeathParameters <: AbstractEpiParameters
     sampling_rate::Float64
 end
 
+# Convenience keyword constructor
+BirthDeathParameters(; birth_rate=2.0, death_rate=0.9, sampling_rate=0.1) =
+    BirthDeathParameters(birth_rate, death_rate, sampling_rate)
+
+
 function BirthDeathParameters(; R₀::Float64=2.0, infectious_period::Float64=1.0, sampling_fraction::Float64=0.1)
     birth_rate = R₀ / infectious_period
     death_rate = (1.0 - sampling_fraction) / infectious_period
     sampling_rate = sampling_fraction / infectious_period
     return BirthDeathParameters(birth_rate, death_rate, sampling_rate)
 end
+
+
+BirthDeathParameter() = BirthDeathParameters(R₀=2.0, infectious_period=1.0, sampling_fraction=0.1)
+
 
 function summarize(p::BirthDeathParameters)
     R₀ = p.birth_rate / (p.death_rate + p.sampling_rate)
@@ -38,18 +47,25 @@ mutable struct AgenticBirthDeathState <: AgenticState
     n_cumulative::Int
 end
 
+AgenticBirthDeathState(; t=0., I=1, currently_infected=collect(1:I), n_sampled=0, n_cumulative=0) =
+    AgenticBirthDeathState(t, I, currently_infected, n_sampled, n_cumulative)
+
 
 mutable struct AggregateBirthDeathState <: AggregateState
     t::Float64
     I::Int
 end
 
+AggregateBirthDeathState(; t=0., I=1) = AggregateBirthDeathState(t, I)
 
-# function BirthDeathModel(; birth_rate=1.0, death_rate=0.1, sampling_rate=0.05, initial_state=nothing)
-#     parms = BirthDeathParameters(birth_rate, death_rate, sampling_rate)
-#     state = isnothing(initial_state) ? AgenticBirthDeathState(; I=1, t=0.0) : initial_state
-#     return BirthDeathModel(parms, BIRTHDEATH_EVENT_TYPES, state)
-# end
+
+function BirthDeathModel(; birth_rate=2.0, death_rate=0.9, sampling_rate=0.1, I=1, agentic=true)
+    parms = BirthDeathParameters(; birth_rate, death_rate, sampling_rate)
+    state = agentic ?
+        AgenticBirthDeathState(; I=I) :
+        AggregateBirthDeathState(; I=I)
+    return BirthDeathModel(parms, BIRTHDEATH_EVENT_TYPES, state)
+end
 
 
 
