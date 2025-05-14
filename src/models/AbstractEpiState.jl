@@ -1,10 +1,21 @@
 abstract type AbstractEpiState end
 
 
+function Base.show(io::IO, state::AbstractEpiState) 
+    fnames = fieldnames(typeof(state))   
+    # Create a named tuple-style string, avoiding module names
+    fields_str = join(["$f=$(getfield(state, f))" for f ∈ fnames], ", ")
+    print(io, "($fields_str)")
+end
+
+
+
+
 abstract type AgenticState <: AbstractEpiState end
 abstract type AggregateState <: AbstractEpiState end
 
 
+# TODO: Remove slices
 abstract type AbstractEpiStateSlice end
 
 

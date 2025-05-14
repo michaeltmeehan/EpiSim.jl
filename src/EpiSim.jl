@@ -36,4 +36,8 @@ include("simulation/simulate.jl")
 
 export simulate, Outbreak, Ensemble
 
+include("simulation/processing.jl")
+
+export get_prevalence_timeseries, get_prevalence, isextinct, calc_extinction_probability
+
 end # module EpiSim

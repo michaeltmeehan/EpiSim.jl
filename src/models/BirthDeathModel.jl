@@ -45,6 +45,14 @@ mutable struct AggregateBirthDeathState <: AggregateState
 end
 
 
+# function BirthDeathModel(; birth_rate=1.0, death_rate=0.1, sampling_rate=0.05, initial_state=nothing)
+#     parms = BirthDeathParameters(birth_rate, death_rate, sampling_rate)
+#     state = isnothing(initial_state) ? AgenticBirthDeathState(; I=1, t=0.0) : initial_state
+#     return BirthDeathModel(parms, BIRTHDEATH_EVENT_TYPES, state)
+# end
+
+
+
 capture(state::Union{AgenticBirthDeathState, AggregateBirthDeathState}) = (; t=state.t, I=state.I)
 
 get_default_stop_condition(model::BirthDeathModel{AgenticBirthDeathState}) = s -> s.n_sampled >= 100
