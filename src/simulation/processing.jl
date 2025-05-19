@@ -61,7 +61,7 @@ function get_prevalence(outbreaks::Vector{<:AbstractOutbreak}, tvec::AbstractVec
 
     n_outbreaks = length(outbreaks)
     n_t = length(tvec)
-    prevalence_matrix = Matrix{Float64}(undef, n_t, n_outbreaks)
+    prevalence_matrix = Matrix{Int64}(undef, n_t, n_outbreaks)
 
     for (j, out) in enumerate(outbreaks)
         prevalence_matrix[:, j] .= get_prevalence(out, tvec)

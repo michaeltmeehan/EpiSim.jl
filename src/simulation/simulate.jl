@@ -18,13 +18,14 @@ struct Ensemble{M<:AbstractEpiModel} <: AbstractEnsemble
 end
 
 
-function sample_event_type(rand_number::Float64, 
+function sample_event_type(rng::AbstractRNG,
                            event_types::Vector{DataType}, 
                            event_rates::Vector{Float64}, 
                            total_event_rate::Float64)
+    r = rand(rng)
     cumulative_probability = event_rates[1] / total_event_rate
     event_index = 1
-    while rand_number > cumulative_probability && event_index < length(event_rates)
+    while r > cumulative_probability && event_index < length(event_rates)
         event_index += 1
         cumulative_probability += event_rates[event_index] / total_event_rate
     end
@@ -53,13 +54,13 @@ function simulate(rng::AbstractRNG,
         total_event_rate == 0.0 && break
 
         # Generate random number for time step and event selection
-        rand_number = rand(rng)
+        # rand_number = rand(rng)
 
         # Update time based on the total event rate
-        state.t -= log(rand_number) / total_event_rate
+        state.t -= log(rand(rng)) / total_event_rate
 
         # Sample an event type based on the event rates
-        event_type = sample_event_type(rand_number, event_types, event_rates, total_event_rate)
+        event_type = sample_event_type(rng, event_types, event_rates, total_event_rate)
 
         # Update model state and extract concrete event record (e.g., Transmission(1, 2, 1.0))
         event = update_state!(rng, model.parameters, state, event_type)

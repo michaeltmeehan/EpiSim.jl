@@ -39,6 +39,7 @@ plot!(tvec, theoretical_std_prevalence, label="Theoretical Std Prevalence", colo
 # Full probability distribution
 function ξ(t::Float64; λ::Float64=birth_rate, μ::Float64=removal_rate)
     r = λ - μ
+    r == 0. && return λ * t / (1. + λ * t)
     return μ * (exp(r * t) - 1.) / (λ * exp(r * t) - μ)
 end
 
@@ -111,4 +112,49 @@ for i in eachindex(t_grid)
 end
 
 
+function get_distribution(a::Matrix{T}, max::Int) where T <: Real
+    n = size(a, 1)
+    m = size(a, 2)
+    dist = zeros(n, max+1)
+    for i in 1:n
+        freqs = countmap(a[i, :])
+        for (k, v) in freqs
+            dist[i, k + 1] = v / m
+        end
+    end
+    return dist
+end
 
+
+ens = simulate(rng, model, 10_000, stop_condition = (state) -> state.t > 5.)
+empirical_prevalence = get_prevalence(ens, t_grid)
+n_max = maximum(empirical_prevalence)
+pop_distribution = get_distribution(empirical_prevalence, n_max)
+p.(0:5, t_grid[1], λ=birth_rate, μ=removal_rate)'
+p.(0:5, t_grid[2], λ=birth_rate, μ=removal_rate)'
+p.(0:5, t_grid[3], λ=birth_rate, μ=removal_rate)'
+p.(0:5, t_grid[4], λ=birth_rate, μ=removal_rate)'
+p.(0:5, t_grid[5], λ=birth_rate, μ=removal_rate)'
+p.(0:5, t_grid[end], λ=birth_rate, μ=removal_rate)'
+
+
+# More than 1 initial infected
+n_sim = 100_000
+initial_infected = 3
+model = BirthDeathModel(birth_rate=birth_rate, 
+                        death_rate=death_rate, 
+                        sampling_rate=sampling_rate, 
+                        I=initial_infected, 
+                        agentic=false)
+ens = simulate(rng, model, n_sim, stop_condition = (state) -> state.t > 5.)
+empirical_prevalence = get_prevalence(ens, t_grid)
+extinction_prob = zeros(length(t_grid))
+for i in eachindex(t_grid)
+    count = 0
+    for j in 1:n_sim
+        count += empirical_prevalence[i, j] == 0 ? 1 : 0
+    end
+    extinction_prob[i] = count / n_sim 
+end
+
+[extinction_prob ξ.(t_grid).^initial_infected]
