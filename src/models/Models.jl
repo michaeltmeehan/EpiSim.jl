@@ -5,7 +5,7 @@ using Lazy
 using Random
 using ..EpiEvent
 import LinearAlgebra: ⋅
-import StatsBase: sample, wsample
+import StatsBase: sample, wsample, quantile
 using ..EpiSim: pop_random!
 
 VALIDATE_STATE = false
@@ -19,6 +19,7 @@ include("MultiTypeBirthDeathModel.jl")
 include("SuperSpreaderModel.jl")
 
 export AbstractEpiModel, AbstractEpiState, AbstractEpiStateSlice
+export calc_R0, calc_infectious_period, calc_sampling_fraction, calc_extinction_probability
 export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel, SuperSpreaderModel
 export simulate_events
 export capture, isagentic

@@ -8,16 +8,13 @@ end
 BirthDeathParameters(; birth_rate=2.0, death_rate=0.9, sampling_rate=0.1) =
     BirthDeathParameters(birth_rate, death_rate, sampling_rate)
 
+calc_R0(par::BirthDeathParameters) = par.birth_rate / (par.death_rate + par.sampling_rate)
 
-function BirthDeathParameters(; R₀::Float64=2.0, infectious_period::Float64=1.0, sampling_fraction::Float64=0.1)
-    birth_rate = R₀ / infectious_period
-    death_rate = (1.0 - sampling_fraction) / infectious_period
-    sampling_rate = sampling_fraction / infectious_period
-    return BirthDeathParameters(birth_rate, death_rate, sampling_rate)
-end
+calc_infectious_period(par::BirthDeathParameters) = 1.0 / (par.death_rate + par.sampling_rate)
 
+calc_sampling_fraction(par::BirthDeathParameters) = par.sampling_rate / (par.death_rate + par.sampling_rate)
 
-BirthDeathParameter() = BirthDeathParameters(R₀=2.0, infectious_period=1.0, sampling_fraction=0.1)
+calc_extinction_probability(par::BirthDeathParameters) = 1. / calc_R0(par)
 
 
 function summarize(p::BirthDeathParameters)
@@ -35,6 +32,11 @@ end
 
 
 @forward BirthDeathModel.parameters summarize
+
+calc_R0(model::BirthDeathModel) = calc_R0(model.parameters)
+calc_infectious_period(model::BirthDeathModel) = calc_infectious_period(model.parameters)
+calc_extinction_probability(model::BirthDeathModel) = calc_extinction_probability(model.parameters)^model.initial_state.I
+
 
 const BIRTHDEATH_EVENT_TYPES = [Transmission, Recovery, Sampling]
 

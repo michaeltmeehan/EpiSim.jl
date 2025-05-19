@@ -74,6 +74,12 @@ function simulate(rng::AbstractRNG,
 end
 
 
+function simulate(model::AbstractEpiModel;
+                  stop_condition::Function=get_default_stop_condition(model))
+    return simulate(Random.GLOBAL_RNG, model; stop_condition=stop_condition)
+end
+
+
 function simulate(rng::AbstractRNG,
                   model::M,
                   n::Int;
@@ -89,4 +95,10 @@ function simulate(rng::AbstractRNG,
         end
         return Ensemble{M}(model, replicates, seeds)
     end
+end
+
+
+function simulate(model::M, n::Int;
+                  stop_condition::Function = get_default_stop_condition(model)) where M <: AbstractEpiModel
+    return simulate(Random.GLOBAL_RNG, model, n; stop_condition=stop_condition)
 end
