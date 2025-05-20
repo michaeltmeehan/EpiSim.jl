@@ -25,8 +25,7 @@ export simulate_events
 export capture, isagentic
 
 
-
-export SIRState
-export EpiState, get_event_types, get_default_stop_condition, initialize_event_log, update_event_rates!, update_state!
+# export SIRState
+export get_event_types, get_default_stop_condition, initialize_event_log, update_event_rates!, update_state!
 
 end

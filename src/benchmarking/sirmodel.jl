@@ -93,9 +93,9 @@ end
 
 β = 2.
 α = 1.
-N = 50
-S0 = 20
-I0 = 30
+N = 4
+S0 = 3
+I0 = 1
 Q_bands = construct_sir_band_matrices(N)
 p0 = zeros((N+1)^2)
 p0[I0 + S0 * (N+1) + 1] = 1.0
@@ -104,4 +104,7 @@ Q_mul!(y, p0, N, α, β, Q_bands)
 
 
 γ = (N-1)*α + max((N-1)*β, α)
-pt = uniformize(p0, 2.0, γ, Q_mul!, N, α, β, Q_bands)
+p1 = uniformize(p0, 1.0, γ, Q_mul!, N, α, β, Q_bands)
+p2 = uniformize(p1, 1.0, γ, Q_mul!, N, α, β, Q_bands)
+pcheck = uniformize(p0, 2.0, γ, Q_mul!, N, α, β, Q_bands)
+[p0 p1 p2 pcheck]
