@@ -111,7 +111,7 @@ for i in eachindex(t_grid)
     end
 end
 
-
+# TODO: Create a file with generic benchmarking utility functions
 function get_distribution(a::Matrix{T}, max::Int) where T <: Real
     n = size(a, 1)
     m = size(a, 2)
