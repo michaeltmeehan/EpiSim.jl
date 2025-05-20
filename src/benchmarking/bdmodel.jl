@@ -126,16 +126,22 @@ function get_distribution(a::Matrix{T}, max::Int) where T <: Real
 end
 
 
+initial_infected = 1
+model = BirthDeathModel(birth_rate=birth_rate, 
+                        death_rate=death_rate, 
+                        sampling_rate=sampling_rate, 
+                        I=initial_infected, 
+                        agentic=true) # Adjust to false to check the aggregate model
 ens = simulate(rng, model, 10_000, stop_condition = (state) -> state.t > 5.)
 empirical_prevalence = get_prevalence(ens, t_grid)
 n_max = maximum(empirical_prevalence)
 pop_distribution = get_distribution(empirical_prevalence, n_max)
-p.(0:5, t_grid[1], λ=birth_rate, μ=removal_rate)'
-p.(0:5, t_grid[2], λ=birth_rate, μ=removal_rate)'
-p.(0:5, t_grid[3], λ=birth_rate, μ=removal_rate)'
-p.(0:5, t_grid[4], λ=birth_rate, μ=removal_rate)'
-p.(0:5, t_grid[5], λ=birth_rate, μ=removal_rate)'
-p.(0:5, t_grid[end], λ=birth_rate, μ=removal_rate)'
+[p.(0:5, t_grid[1], λ=birth_rate, μ=removal_rate)';
+p.(0:5, t_grid[2], λ=birth_rate, μ=removal_rate)';
+p.(0:5, t_grid[3], λ=birth_rate, μ=removal_rate)';
+p.(0:5, t_grid[4], λ=birth_rate, μ=removal_rate)';
+p.(0:5, t_grid[5], λ=birth_rate, μ=removal_rate)';
+p.(0:5, t_grid[end], λ=birth_rate, μ=removal_rate)']
 
 
 # More than 1 initial infected
