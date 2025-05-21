@@ -4,14 +4,14 @@ using ..Models
 abstract type AbstractOutbreak end
 abstract type AbstractEnsemble end
 
-struct Outbreak{M<:AbstractEpiModel} <: AbstractOutbreak
+struct Outbreak{M<:AbstractModel} <: AbstractOutbreak
     model::M
     state_log::DataFrame
-    event_log::Union{Nothing, Vector{AbstractEpiEvent}}
+    event_log::Vector{<:AbstractEpiEvent}
 end
 
 
-struct Ensemble{M<:AbstractEpiModel} <: AbstractEnsemble
+struct Ensemble{M<:AbstractModel} <: AbstractEnsemble
     model::M
     replicates::Vector{Outbreak{M}}
     seeds::Vector{Int}
@@ -34,12 +34,12 @@ end
 
 
 function simulate(rng::AbstractRNG,
-                  model::AbstractEpiModel;
+                  model::AbstractModel;
                   stop_condition::Function=get_default_stop_condition(model))
 
     state = deepcopy(model.initial_state)
     event_types = model.event_types
-    event_log = isagentic(model) ? initialize_event_log(state) : nothing
+    event_log = initialize_event_log(state)
     event_rates = Vector{Float64}(undef, length(event_types))
 
     state_log = [capture(state)]
@@ -47,14 +47,11 @@ function simulate(rng::AbstractRNG,
     # Main simulation loop
     while !stop_condition(state)
 
-        update_event_rates!(event_rates, model.parameters, state)
+        update_event_rates!(event_rates, model.par, state)
 
         total_event_rate = sum(event_rates)
 
         total_event_rate == 0.0 && break
-
-        # Generate random number for time step and event selection
-        # rand_number = rand(rng)
 
         # Update time based on the total event rate
         state.t -= log(rand(rng)) / total_event_rate
@@ -63,10 +60,10 @@ function simulate(rng::AbstractRNG,
         event_type = sample_event_type(rng, event_types, event_rates, total_event_rate)
 
         # Update model state and extract concrete event record (e.g., Transmission(1, 2, 1.0))
-        event = update_state!(rng, model.parameters, state, event_type)
+        event = update_state!(rng, model.par, state, event_type)
 
         # Update event log
-        !isnothing(event) && push!(event_log, event)
+        push!(event_log, event)
 
         # Update state log
         push!(state_log, capture(state))
@@ -75,7 +72,7 @@ function simulate(rng::AbstractRNG,
 end
 
 
-function simulate(model::AbstractEpiModel;
+function simulate(model::AbstractModel;
                   stop_condition::Function=get_default_stop_condition(model))
     return simulate(Random.GLOBAL_RNG, model; stop_condition=stop_condition)
 end
@@ -84,7 +81,7 @@ end
 function simulate(rng::AbstractRNG,
                   model::M,
                   n::Int;
-                  stop_condition::Function = get_default_stop_condition(model)) where M <: AbstractEpiModel
+                  stop_condition::Function = get_default_stop_condition(model)) where M <: AbstractModel
 
     if n == 1
         return simulate(rng, model; stop_condition=stop_condition)
@@ -99,7 +96,8 @@ function simulate(rng::AbstractRNG,
 end
 
 
-function simulate(model::M, n::Int;
-                  stop_condition::Function = get_default_stop_condition(model)) where M <: AbstractEpiModel
+function simulate(model::AbstractModel, 
+                  n::Int;
+                  stop_condition::Function = get_default_stop_condition(model))
     return simulate(Random.GLOBAL_RNG, model, n; stop_condition=stop_condition)
 end

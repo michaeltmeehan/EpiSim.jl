@@ -3,29 +3,31 @@ module Models
 using DataFrames
 using Lazy
 using Random
-using ..EpiEvent
-import LinearAlgebra: ⋅
+import LinearAlgebra: ⋅, diagm
 import StatsBase: sample, wsample, quantile
 using ..EpiSim: pop_random!
 
 VALIDATE_STATE = false
 
-include("AbstractEpiModel.jl")
-include("AbstractEpiState.jl")
+include("AbstractEvent.jl")
+
+export AbstractEvent, AbstractEpiEvent, Seed, Transmission, Activation, Sampling, Recovery
+export time, host
+
+include("AbstractParameters.jl")
+include("AbstractState.jl")
+include("AbstractModel.jl")
+
+export AbstractModel, Model, isagentic, capture
+
 include("SIRModel.jl")
 include("SEIRModel.jl")
 include("BirthDeathModel.jl")
 include("MultiTypeBirthDeathModel.jl")
 include("SuperSpreaderModel.jl")
 
-export AbstractEpiModel, AbstractEpiState, AbstractEpiStateSlice
-export calc_R0, calc_infectious_period, calc_sampling_fraction, calc_extinction_probability
-export BirthDeathModel, SIRModel, SEIRModel, MultiTypeBirthDeathModel, SuperSpreaderModel
-export simulate_events
-export capture, isagentic
+export MTBDModel, BDModel, SIRModel, SEIRModel, SuperSpreaderModel
 
-
-# export SIRState
-export get_event_types, get_default_stop_condition, initialize_event_log, update_event_rates!, update_state!
+export get_default_stop_condition, initialize_event_log, update_event_rates!, update_state!
 
 end
