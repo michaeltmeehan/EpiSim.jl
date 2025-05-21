@@ -11,7 +11,7 @@ function SuperSpreaderModel(; R0::Float64=3.,
     λ = [c * R0 * δ[1]         ρ * c * R0 * δ[2];
                   (1. - c) * R0 * δ[1]  ρ * (1. - c) * R0 * δ[2]]
     λ ./= 1. - (1. - ρ) * (1. - c)
-    par = MTBDParameters(λ, δ, sampling_rate)
+    par = MTBDParameters(λ, recovery_rate, sampling_rate)
     state = agentic ?
         AgenticMTBDState(; I=I) :
         AggregateMTBDState(; I=I)

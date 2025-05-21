@@ -45,33 +45,12 @@ function Q_mul!(out::Vector{Float64}, v::Vector{Float64}, N::Int, α::Vector{Flo
     return out
 end
 
-
-function uniformize_leaky(p0::Vector{Float64}, t::Float64, γ::Float64,
-                          Q_mul!::Function, Q_args...; ε=1e-12, n_max=1000)
-
-    p = zeros(length(p0))
-    q = copy(p0)
-    n = 0
-    w = 1.0  # Poisson weight = (γt)^n / n!
-    expfactor = exp(-γ * t)
-
-    while w * expfactor > ε && n < n_max
-        p .+= w * expfactor * q
-
-        temp = similar(q)
-        Q_mul!(temp, q, Q_args...)
-        q .+= (1 / γ) .* temp
-
-        n += 1
-        w *= γ * t / n
-    end
-
-    return p
-end
-
-N = 3
-α = [0.1, 0.2]
-λ = [0.1 0.2; 0.3 0.4]
+N = 5
+λ = [1. 0.2;
+     10. 2.]
+μ = [0.9, 0.9]
+ψ = [0.1, 0.1]
+α = μ .+ ψ
 Q_bands = construct_mtbd_band_matrices(N)
 p0 = zeros((N+1)^2)
 γ = N * (sum(λ) + sum(α))
@@ -83,3 +62,11 @@ p1 = uniformize(p0, 1.0, γ, Q_mul!, N, α, λ, Q_bands)
 p2 = uniformize(p1, 1.0, γ, Q_mul!, N, α, λ, Q_bands)
 pcheck = uniformize(p0, 2.0, γ, Q_mul!, N, α, λ, Q_bands)
 [p0 p1 p2 pcheck]
+
+model = SIRModel(N=N, I=I0, transmission_rate=β, recovery_rate=α, sampling_rate=0.0)
+rng = Random.MersenneTwister(1234)
+
+ens = simulate(rng, model, 100_000, stop_condition = (state) -> state.t > 1.)
+
+tvec = collect(0.:1.:1.)
+

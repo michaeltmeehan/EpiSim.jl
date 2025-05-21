@@ -63,34 +63,6 @@ function Q_mul!(out::Vector{Float64}, v::Vector{Float64}, N::Int, α::Float64, �
 end
 
 
-function uniformize(p0::Vector{Float64}, t::Float64, γ::Float64,
-                    Q_mul!::Function, Q_args...; ε=1e-10, n_max=1000)
-
-    p = zeros(length(p0))
-    q = copy(p0)
-    w = 1.0
-    n = 0
-    norm_deficit = 1.0
-
-    while norm_deficit > ε && n < n_max
-        p .+= exp(-γ * t) * w * q
-
-        # Apply Q·q → temp, then P·q = q + (1/γ) * Q·q
-        temp = similar(q)
-        Q_mul!(temp, q, Q_args...)
-        q .+= (1 / γ) .* temp
-
-        # Update Poisson weight
-        n += 1
-        w *= γ * t / n
-
-        norm_deficit = 1 - sum(p)  # L1 mass deficit
-    end
-
-    return p
-end
-
-
 β = 2.
 α = 1.
 N = 4
@@ -100,49 +72,17 @@ Q_bands = construct_sir_band_matrices(N)
 p0 = zeros((N+1)^2)
 p0[I0 + S0 * (N+1) + 1] = 1.0
 y = similar(p0)
-Q_mul!(y, p0, N, α, β, Q_bands)
 
 
 γ = (N-1)*α + max((N-1)*β, α)
-p1 = uniformize(p0, 1.0, γ, Q_mul!, N, α, β, Q_bands)
-p2 = uniformize(p1, 1.0, γ, Q_mul!, N, α, β, Q_bands)
-pcheck = uniformize(p0, 2.0, γ, Q_mul!, N, α, β, Q_bands)
-[p0 p1 p2 pcheck]
-
-
-function aggregate_p(p::Vector{Float64}, N::Int)
-    # Reshape p into a matrix
-    P = reshape(p, N+1, N+1)
-
-    # Sum over the rows to get the aggregate distribution
-    aggregate_dist = sum(P, dims=2)
-
-    return aggregate_dist
-end
-
 
 model = SIRModel(N=N, I=I0, transmission_rate=β, recovery_rate=α, sampling_rate=0.0)
 rng = Random.MersenneTwister(1234)
 
 ens = simulate(rng, model, 100_000, stop_condition = (state) -> state.t > 5.)
 
-tvec = collect(0.:0.1:5.)
+tvec = collect(0.:1.:5.)
 empirical_prevalence = get_prevalence(ens, tvec)
-
-function get_distribution(a::Matrix{T}, max::Int) where T <: Real
-    n = size(a, 1)
-    m = size(a, 2)
-    dist = zeros(n, max+1)
-    for i in 1:n
-        freqs = countmap(a[i, :])
-        for (k, v) in freqs
-            dist[i, k + 1] = v / m
-        end
-    end
-    return dist
-end
-
 n_max = maximum(empirical_prevalence)
-pop_distribution = get_distribution(empirical_prevalence, n_max)
-
-[aggregate_p(uniformize(p0, t, γ, Q_mul!, N, α, β, Q_bands), N) for t in tvec]
+empirical_pop_distribution = get_distribution(empirical_prevalence, n_max)
+theoretical_pop_distribution = reduce(vcat, [aggregate_p(uniformize(p0, t, γ, Q_mul!, N, α, β, Q_bands), N)' for t in tvec])
