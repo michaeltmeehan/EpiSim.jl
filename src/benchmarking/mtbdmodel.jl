@@ -46,10 +46,9 @@ function Q_mul!(out::Vector{Float64}, v::Vector{Float64}, N::Int, α::Vector{Flo
 end
 
 N = 5
-λ = [1. 0.2;
-     10. 2.]
-μ = [0.9, 0.9]
-ψ = [0.1, 0.1]
+λ = [2. 2.; 2. 2.]
+μ = [0.5, 0.5]
+ψ = [0.5, 0.5]
 α = μ .+ ψ
 Q_bands = construct_mtbd_band_matrices(N)
 p0 = zeros((N+1)^2)
@@ -63,10 +62,26 @@ p2 = uniformize(p1, 1.0, γ, Q_mul!, N, α, λ, Q_bands)
 pcheck = uniformize(p0, 2.0, γ, Q_mul!, N, α, λ, Q_bands)
 [p0 p1 p2 pcheck]
 
-model = SIRModel(N=N, I=I0, transmission_rate=β, recovery_rate=α, sampling_rate=0.0)
+model = MTBDModel(birth_rate=birth_rate, death_rate=death_rate, sampling_rate=sampling_rate)
 rng = Random.MersenneTwister(1234)
 
-ens = simulate(rng, model, 100_000, stop_condition = (state) -> state.t > 1.)
+ens = simulate(rng, model, 100_000, stop_condition = (state) -> state.t > 0.5, max_iter=500)
 
-tvec = collect(0.:1.:1.)
+tvec = collect(0.:0.1:0.5)
+I1_prevalence = fill(0, length(tvec), 100_000)
+I2_prevalence = fill(0, length(tvec), 100_000)
+for (j, out) in enumerate(ens.replicates)
+    for (i, t) in enumerate(tvec)
+        idx = searchsortedlast(out.state_log.t, t)
+        I1_prevalence[i, j] = out.state_log.I_1[idx]
+        I2_prevalence[i, j] = out.state_log.I_2[idx]
+    end
+end
 
+I1_max = maximum(I1_prevalence)
+I1_empirical_distribution = get_distribution(I1_prevalence, I1_max)
+reduce(vcat, [aggregate_p(uniformize(p0, t, γ, Q_mul!, N, α, λ, Q_bands), N)' for t in tvec])
+
+I2_max = maximum(I2_prevalence)
+I2_empirical_distribution = get_distribution(I2_prevalence, I2_max)
+reduce(hcat, [aggregate_p(uniformize(p0, t, γ, Q_mul!, N, α, λ, Q_bands), N, dims=1)' for t in tvec])'
