@@ -27,6 +27,9 @@ include("MultiTypeBirthDeathModel.jl")
 include("SuperSpreaderModel.jl")
 
 export MTBDModel, BDModel, SIRModel, SEIRModel, SuperSpreaderModel
+export MTBDParameters, BDParameters, SIRParameters, SEIRParameters, SuperSpreaderParameters
+export AgenticMTBDState, AgenticBDState, AgenticSIRState, AgenticSEIRState, AgenticSuperSpreaderState
+export AggregateMTBDState, AggregateBDState, AggregateSIRState, AggregateSEIRState, AggregateSuperSpreaderState
 
 export get_default_stop_condition, initialize_event_log, update_event_rates!, update_state!
 

@@ -40,7 +40,7 @@ MTBDState = Union{AgenticMTBDState, AggregateMTBDState}
 
 function capture(state::MTBDState)
     labels = [:t, Symbol.("I_", 1:length(state.I))...]
-    values = [state.t, state.I...]
+    values = (state.t, state.I...)
     return (; zip(labels, values)...)
 end
 

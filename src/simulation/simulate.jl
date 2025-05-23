@@ -1,20 +1,86 @@
 using ..Models
 
-
-abstract type AbstractOutbreak end
+abstract type AbstractSimulation end
 abstract type AbstractEnsemble end
 
-struct Outbreak{M<:AbstractModel} <: AbstractOutbreak
+
+struct Simulation{M<:AbstractModel} <: AbstractSimulation
     model::M
     state_log::DataFrame
-    event_log::Vector{<:AbstractEpiEvent}
+    event_log::Vector{AbstractEvent}
 end
+
+
+eachstate(sim::Simulation) = eachrow(sim.state_log)
+eachevent(sim::Simulation) = sim.event_log
+
+
+function Base.show(io::IO, sim::Simulation)
+    duration = sim.state_log.t[end] - sim.state_log.t[1]
+    n_steps = nrow(sim.state_log)
+    n_events = length(sim.event_log)
+    counts = event_counts(sim)
+
+    println(io, "Simulation of ", typeof(sim.model))
+    println(io, "  Duration   :  ", round(duration, digits=3))
+    println(io, "  Time steps :  ", n_steps)
+    println(io, "  Events     :  ", n_events)
+    for (etype, count) in sort(collect(counts); by=last, rev=true)
+        println(io, "    ", rpad(nameof(etype), 14), ": ", count)
+    end
+end
+
+
+# TODO: Consider formalizing the above as custom iterators
+# struct EventIterator
+#     sim::Simulation
+# end
+
+# Base.iterate(it::EventIterator) = iterate(it.sim.event_log)
+# Base.iterate(it::EventIterator, state) = iterate(it.sim.event_log, state)
+
+# eachevent(sim::Simulation) = EventIterator(sim)
 
 
 struct Ensemble{M<:AbstractModel} <: AbstractEnsemble
     model::M
-    replicates::Vector{Outbreak{M}}
+    simulations::Vector{Simulation{M}}
     seeds::Vector{Int}
+end
+
+
+eachsim(ens::Ensemble) = ens.simulations
+
+Base.length(ens::Ensemble) = length(ens.simulations)
+Base.getindex(ens::Ensemble, i::Int) = ens.simulations[i]
+Base.getindex(ens::Ensemble, i::AbstractVector{<:Int}) = ens.simulations[i]
+
+Base.iterate(ens::Ensemble) = iterate(ens.simulations)
+Base.iterate(ens::Ensemble, state) = iterate(ens.simulations, state)
+Base.eltype(ens::Ensemble{M}) where M = Simulation{M}
+
+function ensemble_summary(ens::Ensemble)
+    durations = [sim.state_log.t[end] for sim in eachsim(ens)]
+    n_events  = [length(sim.event_log) for sim in eachsim(ens)]
+
+    return (
+        n = length(ens),
+        duration_mean = mean(durations),
+        duration_range = extrema(durations),
+        event_mean = mean(n_events),
+        event_range = extrema(n_events)
+    )
+end
+
+
+function Base.show(io::IO, ens::Ensemble)
+    s = ensemble_summary(ens)
+
+    println(io, "Ensemble of ", s.n, " simulations (", typeof(ens.model), ")")
+    println(io, "  Duration:   mean = $(round(s.duration_mean, digits=3))")
+    println(io, "              range = ", round.(s.duration_range, digits=3))
+    println(io, "  Events:     mean = $(round(s.event_mean, digits=1))")
+    println(io, "              range = ", s.event_range)
 end
 
 
@@ -35,30 +101,17 @@ end
 
 function simulate(rng::AbstractRNG,
                   model::AbstractModel;
-                  stop_condition::Function=get_default_stop_condition(model),
-                  max_iter::Int=100_000)
+                  stop_condition::Function=get_default_stop_condition(model))
 
     state = deepcopy(model.initial_state)
     event_types = model.event_types
     event_rates = Vector{Float64}(undef, length(event_types))
-
-    initial_state_log = capture(state)
-    state_log = Vector{typeof(initial_state_log)}(undef, max_iter)
-    state_log[1] = initial_state_log
-
-    initial_event_log = initialize_event_log(state)
-    event_log = Vector{Union{event_types..., [typeof(event) for event in initial_event_log]...}}(undef, max_iter)
-    for (i, event) in enumerate(initial_event_log)
-        event_log[i] = event
-    end
-    
-    n = 1
-    m = length(initial_event_log)
-    # event_log = initialize_event_log(state)
-    # state_log = [capture(state)]
+    event_log = Vector{AbstractEvent}()
+    push!(event_log, initialize_event_log(state)...)
+    state_log = [capture(state)]
 
     # Main simulation loop
-    while !stop_condition(state) && n < max_iter && m < max_iter
+    while !stop_condition(state)
 
         update_event_rates!(event_rates, model.par, state)
 
@@ -75,26 +128,18 @@ function simulate(rng::AbstractRNG,
         # Update model state and extract concrete event record (e.g., Transmission(1, 2, 1.0))
         event = update_state!(rng, model.par, state, event_type)
 
-        # Update iteration counters
-        n += 1
-        m += 1
-
         # Update event log
-        event_log[m] = event
-        # push!(event_log, event)
+        push!(event_log, event)
 
         # Update state log
-        state_log[n] = capture(state)
-        # push!(state_log, capture(state))
+        push!(state_log, capture(state))
     end
-    return Outbreak(model, DataFrame(state_log[1:n]), event_log[1:m])
-    # return Outbreak(model, DataFrame(state_log), event_log)
+    return Simulation(model, DataFrame(state_log), event_log)
 end
 
 
 function simulate(model::AbstractModel;
-                  stop_condition::Function=get_default_stop_condition(model),
-                  max_iter::Int=100_000)
+                  stop_condition::Function=get_default_stop_condition(model))
     return simulate(Random.GLOBAL_RNG, model; stop_condition=stop_condition)
 end
 
@@ -102,25 +147,23 @@ end
 function simulate(rng::AbstractRNG,
                   model::M,
                   n::Int;
-                  stop_condition::Function = get_default_stop_condition(model),
-                  max_iter::Int=100_000) where M <: AbstractModel
+                  stop_condition::Function = get_default_stop_condition(model)) where M <: AbstractModel
 
     if n == 1
-        return simulate(rng, model; stop_condition=stop_condition, max_iter=max_iter)
+        return simulate(rng, model; stop_condition=stop_condition)
     else
         seeds = rand(rng, UInt32(1):UInt32(2^31-1), n)
-        replicates = Vector{Outbreak{M}}(undef, n)
+        simulations = Vector{Simulation{M}}(undef, n)
         Threads.@threads for i in 1:n
-            replicates[i] = simulate(MersenneTwister(seeds[i]), model; stop_condition=stop_condition, max_iter=max_iter)
+            simulations[i] = simulate(MersenneTwister(seeds[i]), model; stop_condition=stop_condition)
         end
-        return Ensemble{M}(model, replicates, seeds)
+        return Ensemble{M}(model, simulations, seeds)
     end
 end
 
 
 function simulate(model::AbstractModel, 
                   n::Int;
-                  stop_condition::Function = get_default_stop_condition(model),
-                  max_iter::Int=100_000)
-    return simulate(Random.GLOBAL_RNG, model, n; stop_condition=stop_condition, max_iter=max_iter)
+                  stop_condition::Function = get_default_stop_condition(model))
+    return simulate(Random.GLOBAL_RNG, model, n; stop_condition=stop_condition)
 end

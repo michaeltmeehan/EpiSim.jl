@@ -1,79 +1,34 @@
+event_counts(sim::AbstractSimulation) = StatsBase.countmap(typeof.(sim.event_log))
 
-# Default function for all models - can be overloaded if required
-function get_prevalence_timeseries(df::DataFrame)
-    if :I ∉ propertynames(df)
-        throw(ArgumentError("Prevalence column `I` not found in DataFrame"))
-    end
-    (; t = df.t, prevalence = df.I)
-end
 
-function get_prevalence_timeseries(out::AbstractOutbreak)
-    return get_prevalence_timeseries(out.state_log)
+function get_state(sim::AbstractSimulation, t::Real)
+    idx = searchsortedlast(sim.state_log.t, t)
+    isnothing(idx) &&  throw(ArgumentError("No state recorded at or before t = $t"))
+    return (; t=t, sim.state_log[idx, Not(:t)]...)
 end
 
 
-# An example overload for a specific model
-# function get_prevalence_timeseries(out::Outbreak{<:SEIRModel})
-#     df = out.state_log
-#     (; t = df.t, prevalence = df.E + df.I)
+function get_state(sim::AbstractSimulation, tvec::AbstractVector{<:Real})
+    states = [get_state(sim, t) for t in tvec]
+    return Tables.columntable(states)
+end
+
+
+# struct StateTable
+#     t::AbstractVector{<:Real}
+#     vars::NamedTuple
 # end
 
 
-function get_prevalence(df::DataFrame, t::Real)
-    idx = searchsortedlast(df.t, t)
-    if isnothing(idx)
-        throw(ArgumentError("No state recorded at or before t = $t"))
-    end
-    return get_prevalence_timeseries(df).prevalence[idx]
+
+function get_state(ens::AbstractEnsemble, tvec::AbstractVector{<:Real})
+    states = [get_state(sim, tvec) for sim in ens]
+    states = Tables.columntable(states)[Not(:t)]
+    return merge((t=tvec,), states)
 end
 
 
-function get_prevalence(out::AbstractOutbreak, t::Real)
-    return get_prevalence(out.state_log, t)
-end
 
-
-function get_prevalence(df::DataFrame, tvec::AbstractVector{<:Real})
-    @assert issorted(tvec) "Query times must be sorted for get_prevalence(...)."
-
-    ts_prev = get_prevalence_timeseries(df)
-    ts = ts_prev.t
-    prevalences = ts_prev.prevalence
-
-    idxs = map(t -> searchsortedlast(ts, t), tvec)
-    return [iszero(i) ? throw(ArgumentError("No state before t = $(tvec[j])")) : prevalences[i]
-            for (j, i) in enumerate(idxs)]
-end
-
-
-function get_prevalence(out::AbstractOutbreak, t::AbstractVector{<:Real})
-    return get_prevalence(out.state_log, t)
-end
-
-
-function get_prevalence(outbreaks::Vector{<:AbstractOutbreak}, t::Real)
-    return [get_prevalence(out, t) for out in outbreaks]
-end
-
-
-function get_prevalence(outbreaks::Vector{<:AbstractOutbreak}, tvec::AbstractVector{<:Real})
-    @assert issorted(tvec) "Query times must be sorted for get_prevalence(...)."
-
-    n_outbreaks = length(outbreaks)
-    n_t = length(tvec)
-    prevalence_matrix = Matrix{Int64}(undef, n_t, n_outbreaks)
-
-    for (j, out) in enumerate(outbreaks)
-        prevalence_matrix[:, j] .= get_prevalence(out, tvec)
-    end
-
-    return prevalence_matrix  # rows = timepoints, cols = outbreak replicates
-end
-
-
-function get_prevalence(ens::AbstractEnsemble, tvec::AbstractVector{<:Real})
-    return get_prevalence(ens.replicates, tvec)
-end
 
 
 function get_prevalence_quantiles(ens::AbstractEnsemble,
@@ -139,24 +94,24 @@ function isextinct(df::DataFrame)::Bool
 end
 
 
-function isextinct(out::AbstractOutbreak)::Bool
-    return isextinct(out.state_log)
+function isextinct(sim::AbstractSimulation)::Bool
+    return isextinct(sim.state_log)
 end
 
 
-function isextinct(outbreaks::Vector{<:AbstractOutbreak})::Vector{Bool}
-    return [isextinct(out) for out in outbreaks]
+function isextinct(sims::Vector{<:AbstractSimulation})::Vector{Bool}
+    return [isextinct(sim) for sim in sims]
 end
 
 
 function isextinct(ens::AbstractEnsemble)::Vector{Bool}
-    return isextinct(ens.replicates)
+    return isextinct(ens.simulations)
 end
 
 
 function get_extinction_probability(ens::AbstractEnsemble)::Float64
     n_extinct = count(isextinct(ens))
-    return n_extinct / length(ens.replicates)
+    return n_extinct / length(ens.simulations)
 end
 
 

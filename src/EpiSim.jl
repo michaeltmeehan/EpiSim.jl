@@ -25,13 +25,19 @@ using .Models
 export Model
 export AbstractModel, Model
 export MTBDModel, BDModel, SIRModel, SEIRModel, SuperSpreaderModel
+export MTBDParameters, BDParameters, SIRParameters, SEIRParameters, SuperSpreaderParameters
+export AgenticMTBDState, AgenticBDState, AgenticSIRState, AgenticSEIRState, AgenticSuperSpreaderState
+export AggregateMTBDState, AggregateBDState, AggregateSIRState, AggregateSEIRState, AggregateSuperSpreaderState
 
 include("simulation/simulate.jl")
 
-export simulate, Outbreak, Ensemble
+export simulate, Simulation, Ensemble
+export eachstate, eachevent, eachsim
 
 include("simulation/processing.jl")
 
-export get_prevalence_timeseries, get_prevalence, get_prevalence_quantiles, plot_prevalence, isextinct, get_extinction_probability
+export event_counts, get_state
+
+export plot_prevalence, isextinct, get_extinction_probability
 
 end # module EpiSim
