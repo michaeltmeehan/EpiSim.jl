@@ -1,4 +1,8 @@
+import ..Models: n_sampled, n_recovered, n_transmissions, n_activations, n_seeds, n_events
+
 event_counts(sim::AbstractSimulation) = StatsBase.countmap(typeof.(sim.event_log))
+
+@forward Simulation.event_log n_sampled, n_recovered, n_transmissions, n_activations, n_seeds, n_events
 
 
 function get_state(sim::AbstractSimulation, t::Real)

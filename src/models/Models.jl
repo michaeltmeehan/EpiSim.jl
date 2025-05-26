@@ -32,5 +32,6 @@ export AgenticMTBDState, AgenticBDState, AgenticSIRState, AgenticSEIRState, Agen
 export AggregateMTBDState, AggregateBDState, AggregateSIRState, AggregateSEIRState, AggregateSuperSpreaderState
 
 export get_default_stop_condition, initialize_event_log, update_event_rates!, update_state!
+export n_sampled, n_recovered, n_transmissions, n_activations, n_seeds, n_events
 
 end

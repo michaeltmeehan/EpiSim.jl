@@ -28,6 +28,9 @@ export MTBDModel, BDModel, SIRModel, SEIRModel, SuperSpreaderModel
 export MTBDParameters, BDParameters, SIRParameters, SEIRParameters, SuperSpreaderParameters
 export AgenticMTBDState, AgenticBDState, AgenticSIRState, AgenticSEIRState, AgenticSuperSpreaderState
 export AggregateMTBDState, AggregateBDState, AggregateSIRState, AggregateSEIRState, AggregateSuperSpreaderState
+export n_sampled, n_recovered, n_transmissions, n_activations, n_seeds, n_events
+
+export AbstractEvent, Seed, Transmission, Recovery, Activation, Sampling
 
 include("simulation/simulate.jl")
 
