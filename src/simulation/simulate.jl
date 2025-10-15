@@ -88,12 +88,12 @@ function sample_event_type(rng::AbstractRNG,
                            event_types::Vector{DataType}, 
                            event_rates::Vector{Float64}, 
                            total_event_rate::Float64)
-    r = rand(rng)
-    cumulative_probability = event_rates[1] / total_event_rate
+    r = rand(rng) * total_event_rate
+    cumulative_weight = event_rates[1]
     event_index = 1
-    while r > cumulative_probability && event_index < length(event_rates)
+    while r > cumulative_weight && event_index < length(event_rates)
         event_index += 1
-        cumulative_probability += event_rates[event_index] / total_event_rate
+        cumulative_weight += event_rates[event_index]
     end
     return event_types[event_index]
 end

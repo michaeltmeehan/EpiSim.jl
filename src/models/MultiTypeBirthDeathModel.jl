@@ -76,9 +76,10 @@ end
 
 @inline function sample_types(rng::AbstractRNG,
                               w::Matrix{Float64})::Tuple{Int, Int}
-    w ./= sum(w)
+    s = sum(w)
+    # w ./= sum(w)
     n = size(w, 1)
-    r = rand(rng)
+    r = rand(rng) * s
     cumulative_probability = w[1]
     idx = 1
     while r > cumulative_probability && idx < n^2
@@ -91,9 +92,10 @@ end
 
 @inline function sample_type(rng::AbstractRNG,
                              w::Vector{Float64})::Int
-    w ./= sum(w)
+    s = sum(w)
+    # w ./= sum(w)
     n = length(w)
-    r = rand(rng)
+    r = rand(rng) * s
     cumulative_probability = w[1]
     idx = 1
     while r > cumulative_probability && idx < n

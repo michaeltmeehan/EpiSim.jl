@@ -7,7 +7,7 @@ event_counts(sim::AbstractSimulation) = StatsBase.countmap(typeof.(sim.event_log
 
 function get_state(sim::AbstractSimulation, t::Real)
     idx = searchsortedlast(sim.state_log.t, t)
-    isnothing(idx) &&  throw(ArgumentError("No state recorded at or before t = $t"))
+    idx == 0 &&  throw(ArgumentError("No state recorded at or before t = $t"))
     return (; t=t, sim.state_log[idx, Not(:t)]...)
 end
 
