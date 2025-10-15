@@ -108,7 +108,7 @@ end
 @inline function update_state!(rng::AbstractRNG,
                                par::MTBDParameters,
                                state::AggregateMTBDState, 
-                               ::Type{Transmission})::Nothing
+                               ::Type{Transmission})::Transmission
     weights = par.birth_rate * diagm(state.I)
     child_type, _ = sample_types(rng, weights)
     state.I[child_type] += 1
@@ -134,7 +134,7 @@ end
 @inline function update_state!(rng::AbstractRNG,
                                par::MTBDParameters,
                                state::AggregateMTBDState, 
-                               ::Type{Recovery})::Nothing
+                               ::Type{Recovery})::Recovery
     # Recovery event
     weights = par.death_rate .* state.I
     recovery_type = sample_type(rng, weights)
@@ -159,7 +159,7 @@ end
 @inline function update_state!(rng::AbstractRNG,
                                par::MTBDParameters,
                                state::AggregateMTBDState, 
-                               ::Type{Sampling})::Nothing
+                               ::Type{Sampling})::Sampling
     # Recovery event
     weights = par.sampling_rate .* state.I
     sampled_type = sample_type(rng, weights)

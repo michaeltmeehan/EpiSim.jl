@@ -134,6 +134,12 @@ function simulate(rng::AbstractRNG,
         # Update state log
         push!(state_log, capture(state))
     end
+
+    # Check if final state violates stop condition
+    if stop_condition(state)
+        pop!(state_log)  # Remove last state if it violates stop condition
+        pop!(event_log)  # Remove last event if it violates stop condition
+    end
     return Simulation(model, DataFrame(state_log), event_log)
 end
 
