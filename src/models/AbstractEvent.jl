@@ -38,9 +38,9 @@ struct Activation <: AbstractEpiEvent
 end
 
 
-n_sampled(event_log::Vector{<:AbstractEvent}) = count(x -> x isa Sampling, event_log)
-n_recovered(event_log::Vector{<:AbstractEvent}) = count(x -> x isa Recovery, event_log)
-n_transmissions(event_log::Vector{<:AbstractEvent}) = count(x -> x isa Transmission, event_log)
-n_activations(event_log::Vector{<:AbstractEvent}) = count(x -> x isa Activation, event_log)
-n_seeds(event_log::Vector{<:AbstractEvent}) = count(x -> x isa Seed, event_log)
-n_events(event_log::Vector{<:AbstractEvent}) = length(event_log)
+n_sampled(events::Vector{<:AbstractEvent}) = count(x -> x isa Sampling, events)
+n_recovered(events::Vector{<:AbstractEvent}) = count(x -> x isa Recovery, events)
+n_transmissions(events::Vector{<:AbstractEvent}) = count(x -> x isa Transmission, events)
+n_activations(events::Vector{<:AbstractEvent}) = count(x -> x isa Activation, events)
+n_seeds(events::Vector{<:AbstractEvent}) = count(x -> x isa Seed, events)
+n_events(events::Vector{<:AbstractEvent}) = length(events)
