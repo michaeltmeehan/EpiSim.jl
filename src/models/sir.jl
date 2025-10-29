@@ -31,7 +31,97 @@ const SIREVENTS = [Transmission, Recovery, Sampling, Seeding]
 get_events(model::SIR) = SIREVENTS
 
 
-capture(state::Union{SIRCount, SIRAgent}) = SIRCount(state.S, state.I, state.R, state.N)
+const SIRState = Union{SIRCount, SIRAgent}
+
+capture(state::Union{SIRState}) = SIRCount(state.S, state.I, state.R, state.N)
+
+
+function initialize_rates(model::SIR, state::SIRState)
+    S = state.S
+    I = state.I
+    N = state.N
+
+    λ = Vector{Float64}(undef, 4)
+
+    λ[1] = model.β * S * I / N      # Transmission
+    λ[2] = model.α * I              # Recovery
+    λ[3] = model.ψ * I              # Sampling
+    λ[4] = model.ε                  # Seeding
+    return λ
+end
+
+
+function update!(rng::AbstractRNG,
+                 model::SIR,
+                 state::SIRState,
+                 λ::Vector{Float64},
+                 event_type::Type{Seeding}) 
+
+    # Update state and return event
+    state.I += 1
+    state.N += 1
+
+    # Update rates affected by the event
+    λ[1] += model.β * state.S / state.N    # Transmission
+    λ[2] += model.α                      # Recovery
+    λ[3] += model.ψ                      # Sampling
+
+    return Seeding(0)
+end
+
+
+function update!(rng::AbstractRNG,
+                 model::SIR,
+                 state::SIRState,
+                 λ::Vector{Float64},
+                 event_type::Type{Transmission})
+
+    # Update state and return event
+    state.S -= 1
+    state.I += 1
+
+    # Update rates affected by the event
+    λ[1] += model.β * state.S / state.N    # Transmission
+    λ[2] += model.α                      # Recovery
+    λ[3] += model.ψ                      # Sampling
+    return Transmission(0, 0)
+end
+
+
+function update!(rng::AbstractRNG,
+                 model::SIR,
+                 state::SIRState,
+                 λ::Vector{Float64},
+                 event_type::Type{Recovery})
+
+    # Update state and return event
+    state.I -= 1
+    state.R += 1
+
+    # Update rates affected by the event
+    λ[1] += model.β * state.S / state.N    # Transmission
+    λ[2] -= model.α                      # Recovery
+    λ[3] -= model.ψ                      # Sampling
+    return Recovery(0)
+end
+
+
+function update!(rng::AbstractRNG,
+                 model::SIR,
+                 state::SIRState,
+                 λ::Vector{Float64},
+                 event_type::Type{Sampling})
+
+    # Update state and return event
+    state.I -= 1
+    state.R += 1
+
+    # Update rates affected by the event
+    λ[1] += model.β * state.S / state.N    # Transmission
+    λ[2] -= model.α                      # Recovery
+    λ[3] -= model.ψ                      # Sampling
+    return Sampling(0)
+end
 
 
 function update_rates!(λ::Vector{Float64}, model::SIR, state::AbstractState)

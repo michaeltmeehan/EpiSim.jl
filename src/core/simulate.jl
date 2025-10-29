@@ -111,24 +111,33 @@ function simulate(model::M,
     events = Union{EVENTS...}[Seeding(0)]  # Initialize with seed event
 
     # Initialize rates vector
-    λ = Vector{Float64}(undef, length(EVENTS))
+    λ = initialize_rates(model, state)
+    λ_tot = 0.0
+    for rate in λ
+        λ_tot += rate
+    end
 
     while t < tf && !stop(state)
-        # Update rates
-        update_rates!(λ, model, state)
-
-        λ_tot = sum(λ)
-        λ_tot == 0.0 && break
 
         # Sample time to next event
         t += randexp(rng) / λ_tot
         t >= tf && break
 
         # Sample event type
-        ev_idx = wsampleindex(rng, λ)
+        event_type = wsample(rng, EVENTS, λ)
 
-        # Update state / apply event
-        event = update_state!(rng, model, state, EVENTS[ev_idx])
+        # Update state and rates
+        event = update!(rng, model, state, λ, event_type)
+
+        # Update rates
+        # update_rates!(λ, model, state)
+
+        # Recompute total rate
+        λ_tot = 0.0
+        for rate in λ
+            λ_tot += rate
+        end
+        λ_tot == 0.0 && break
 
         # Record event
         push!(events, event)

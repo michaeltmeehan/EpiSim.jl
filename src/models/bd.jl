@@ -39,6 +39,90 @@ function update_rates!(λ::Vector{Float64}, model::BD, state::AbstractState)
 end
 
 
+function initialize_rates(model::BD, state::AbstractState)
+    I = state.I
+
+    λ = Vector{Float64}(undef, 4)
+
+    λ[1] = model.λ * I      # Birth
+    λ[2] = model.μ * I      # Death
+    λ[3] = model.ψ * I      # Sampling
+    λ[4] = model.ε          # Seeding
+    return λ
+end
+
+
+function update!(rng::AbstractRNG,
+                 model::BD,
+                 state::AbstractState,
+                 λ::Vector{Float64},
+                 event_type::Type{Seeding})
+
+    # Update state and return event
+    state.I += 1
+
+    # Update rates
+    λ[1] += model.λ      # Birth
+    λ[2] += model.μ      # Death
+    λ[3] += model.ψ      # Sampling
+
+    return Seeding(0)
+end
+
+
+function update!(rng::AbstractRNG,
+                 model::BD,
+                 state::AbstractState,
+                 λ::Vector{Float64},
+                 event_type::Type{Transmission})
+
+    # Update state and return event
+    state.I += 1
+
+    # Update rates
+    λ[1] += model.λ      # Birth
+    λ[2] += model.μ      # Death
+    λ[3] += model.ψ      # Sampling
+
+    return Transmission(0, 0)
+end
+
+
+function update!(rng::AbstractRNG,
+                 model::BD,
+                 state::AbstractState,
+                 λ::Vector{Float64},
+                 event_type::Type{Recovery})
+
+    # Update state and return event
+    state.I -= 1
+
+    # Update rates
+    λ[1] -= model.λ      # Birth
+    λ[2] -= model.μ      # Death
+    λ[3] -= model.ψ      # Sampling
+
+    return Recovery(0)
+end
+
+
+function update!(rng::AbstractRNG,
+                 model::BD,
+                 state::AbstractState,
+                 λ::Vector{Float64},
+                 event_type::Type{Sampling})
+
+    # Update state and return event
+    state.I -= 1
+
+    # Update rates
+    λ[1] -= model.λ      # Birth
+    λ[2] -= model.μ      # Death
+    λ[3] -= model.ψ      # Sampling
+
+    return Sampling(0)
+end
+
 # For each event in BDEVENTS, define how it updates the state
 ### Count states ###
 @inline function update_state!(rng::AbstractRNG,
