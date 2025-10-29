@@ -6,6 +6,8 @@ import Base.Threads
 using Crayons
 using DataFrames
 using DataFramesMeta
+using DataStructures: BinaryMinHeap, push!, pop!, top
+using Distributions
 using LinearAlgebra
 using Lazy
 using Parameters
@@ -49,6 +51,11 @@ export BD, BDAgent, BDCount
 include("models/mtbd.jl")
 
 export MTBD, MTBDAgent, MTBDCount, SSBD, SSBDAgent, SSBDCount
+
+
+include("core/sellke.jl")
+
+export sellke
 
 
 end # module EpiSim
