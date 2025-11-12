@@ -55,7 +55,7 @@ export MTBD, MTBDAgent, MTBDCount, SSBD, SSBDAgent, SSBDCount
 
 include("core/sellke.jl")
 
-export sellke, draw_recovery_time, draw_transmission_rate
+export sellke
 
 
 end # module EpiSim
