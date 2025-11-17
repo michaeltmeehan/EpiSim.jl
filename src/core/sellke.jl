@@ -1,3 +1,5 @@
+_dirac(x::Float64) = DiscreteNonParametric([x], [1.0])
+_to_dist(x::Union{Float64, Distribution}, exp_default=false) = x isa Distribution ? x : (exp_default ? Exponential(x) : _dirac(x))
 
 
 function sellke(I₀::Int, 
@@ -18,8 +20,8 @@ function sellke(I₀::Int,
     resistances = BinaryMinHeap{Float64}(randexp(S₀))
 
     # Convert β and τ if necessary
-    dβ = typeof(β) <: Distribution ? β : Dirac(β)
-    dτ = typeof(τ) <: Distribution ? τ : Exponential(τ)
+    dβ = _to_dist(β)
+    dτ = _to_dist(τ, true)
 
     # Draw transmission rate and recovery times for initial infecteds
     recovery_times = t .+ rand(dτ, I₀)
@@ -70,7 +72,110 @@ function sellke(I₀::Int,
 end
 
 
+@enum State::UInt8 begin
+    SUSCEPTIBLE = 0
+    EXPOSED = 1
+    INFECTIOUS = 2
+    RECOVERED = 3
+end
 
+
+# mutable struct Agent
+#     id::Int
+#     state::State
+#     resistance::Float64
+#     transmission_rate::Float64
+#     incubation_period::Float64
+#     infectious_period::Float64
+#     sampling_period::Float64
+#     remove_on_sample::Bool
+# end
+
+
+# Base.isless(a1::Agent, a2::Agent) = a1.resistance < a2.resistance
+
+
+abstract type Agent end
+
+
+mutable struct Susceptible <: Agent
+    id::Int
+    resistance::Float64
+end
+
+Base.isless(s1::Susceptible, s2::Susceptible) = s1.resistance < s2.resistance
+
+
+struct Traits
+    transmission_rate::Float64
+    incubation_period::Float64
+    infectious_period::Float64
+    sampling_period::Float64
+    remove_on_sample::Bool
+end
+
+
+mutable struct Infected <: Agent
+    id::Int
+    traits::Traits
+    events::Vector{Event}
+    head::Int
+end
+
+isdone(infected::Infected) = infected.head > length(infected.events)
+next_event(infected::Infected) = !isdone(infected) ? infected.events[infected.head] : nothing
+next_time(agent::Infected) = agent.events[agent.head].time
+Base.isless(i1::Infected, i2::Infected) = next_time(i1) < next_time(i2)
+
+
+isfossil(infected::Infected) = infected.traits.remove_on_sample
+
+
+struct TraitDists
+    dβ::Distribution
+    dτₑ::Distribution
+    dτᵢ::Distribution
+    dτₛ::Distribution
+end
+
+
+function TraitDists(β::Union{Float64, Distribution},
+                    τₑ::Union{Float64, Distribution},
+                    τᵢ::Union{Float64, Distribution},
+                    τₛ::Union{Float64, Distribution})
+    return TraitDists(_to_dist(β), _to_dist(τₑ, true), _to_dist(τᵢ, true), _to_dist(τₛ, true))
+end
+
+
+Base.rand(td::TraitDists, r::Float64) = Traits(rand(td.dβ), rand(td.dτₑ), rand(td.dτᵢ), rand(td.dτₛ), rand() < r)
+
+
+function make_infected(t::Float64, id::Int, td::TraitDists, r::Float64; exposed::Bool)
+    tr = rand(td, r)    # Generate traits
+
+    # Absolute times
+    t_EI  = exposed ? t + tr.incubation_period : t            # E→I (activation) or already infectious
+    t_rec = t_EI + tr.infectious_period
+    t_smp = t_EI + tr.sampling_period
+
+    events = Event[]
+    if exposed
+        push!(events, Activation(t_EI, id))
+    end
+
+    if tr.remove_on_sample && t_smp < t_rec
+        # sampling causes removal; no recovery event needed
+        push!(events, Sampling(t_smp, id))
+    else
+        # optional non-removal sampling (only if it occurs before recovery)
+        if t_smp < t_rec
+            push!(events, Sampling(t_smp, id))
+        end
+        push!(events, Recovery(t_rec, id))
+    end
+
+    return Infected(id, tr, events, 1)
+end
 
 
 function sellke(S₀::Int, 
@@ -83,113 +188,112 @@ function sellke(S₀::Int,
                 r::Float64                           # Probability of removal upon sampling
                 )
 
-    @assert I₀ ≥ 0 "Number of initial infected I₀ must be at least 0"
-    @assert S₀ ≥ 0 "Number of susceptibles S₀ must be at least 0"
-
     # Initialize number of exposed, infected, susceptible and recovered
-    E = E₀; I = I₀; S = S₀; R = 0; N = E₀ + I₀ + S₀
+    S, E, I, R = S₀, E₀, I₀, 0
+    
+    # Total population size
+    N = E₀ + I₀ + S₀
 
-    Λ = 0.0     # Cumulative infection pressure
-    t = 0.0     # Current time
+    # Initialize time and cumulative infection pressure
+    t = Λ = 0.0
 
-    # Draw resistances for susceptibles (Exp(1))
-    resistances = BinaryMinHeap{Float64}(randexp(S₀))
+    # Package parameters as distributions of traits
+    td = TraitDists(β, τₑ, τᵢ, τₛ)
 
-    # Convert parameters to distributions if necessary
-    dβ = typeof(β) <: Distribution ? β : Dirac(β)
-    dτₑ = typeof(τₑ) <: Distribution ? τₑ : Exponential(τₑ)
-    dτᵢ = typeof(τᵢ) <: Distribution ? τᵢ : Exponential(τᵢ)
-    dτₛ = typeof(τₛ) <: Distribution ? τₛ : Exponential(τₛ)
+    # Initialize vectors of exposed and infective individuals
+    exposed = [make_infected(t, id, td, r; exposed=true) for id in 1:E₀]
+    infectives = [make_infected(t, id, td, r; exposed=false) for id in (E₀ + 1):(E₀ + I₀)]
 
-    @assert 0 < mean(dβ) < Inf "Transmission rate distribution must have a positive, finite mean"
-    @assert 0 < mean(dτₑ) < Inf "Incubation time distribution must have a positive, finite mean"
-    @assert 0 < mean(dτᵢ) < Inf "Infectious period distribution must have a positive, finite mean"
-    @assert 0 < mean(dτₛ) < Inf "Sampling time distribution must have a positive, finite mean"
+    # Initialize ordered heap of susceptible individuals
+    susceptibles = BinaryMinHeap{Susceptible}([Susceptible(id, randexp()) for id in (E₀ + I₀ + 1):N])
 
-    # Draw transmission rates for all infected individuals
-    transmission_rates = rand(dβ, E₀ + I₀)
-    slope = sum(transmission_rates) / N
+    # Initialize ordered heap of infected individuals (i.e., those who are exposed or infective)
+    infecteds = BinaryMinHeap{Infected}(vcat(exposed, infectives))
 
-    # Draw activation, infectious and sampling periods for initial infecteds
-    activation_periods = vcat(rand(dτₑ, E₀), fill(0.0, I₀))
-    infectious_periods = rand(dτᵢ, E₀ + I₀)
-    sampling_periods = rand(dτₛ, E₀ + I₀)
-
-    # Convert periods to event times
-    activation_times = t .+ activation_periods
-    recovery_times = activation_times .+ infectious_periods
-    sampling_times = activation_times .+ sampling_periods
-
-    event_times = activation_times
-    for i in 1:(E₀ + I₀)
-        if recovery_times[i] < sampling_times[i]
-            # Individual recovers before being sampled
-            push!(event_times, recovery_times[i])
-        elseif rand() < r
-            # Individual is removed upon sampling
-            push!(event_times, sampling_times[i])
-        else
-            # Individual is sampled but not removed
-            push!(event_times, sampling_times[i])
-            push!(event_times, recovery_times[i])
-        end
+    # Initialize list of transmission rates for sampling infectors
+    transmission_rates = fill(0.0, N)
+    for infective in infectives
+        transmission_rates[infective.id] = infective.traits.transmission_rate
     end
 
-    # Create heaps for events
-    activations = collect(zip(activation_times, 1:(E₀ + I₀), :activation))
-    recoveries = collect(zip(recovery_times, transmission_rates, :recovery))
-    samplings = collect(zip(sampling_times, transmission_rates, :sampling))
-    events = vcat(activations, recoveries, samplings)
-    event_heap = BinaryMinHeap{Tuple{Float64, Float64, Symbol}}(events)
+    # Calculate initial slope (i.e., cumulative transmission rate)
+    dΛ = sum(transmission_rates) / N
 
-    while (E > 0 || I > 0) && S > 0
+    # Initialize event log
+    events = Event[]
+
+    while E + I > 0
+
+        # Look up time for next infected event
+        t_next = next_time(top(infecteds))
 
         # Work out whether infection or temporal event occurs next
-        if top(resistances) ≤ Λ + slope * (top(event_heap)[1] - t) # Infection event
+        if !isempty(susceptibles) && top(susceptibles).resistance ≤ Λ + dΛ * (t_next - t) # Infection event
 
-            # Update number of infected and susceptibles
-            I += 1; S -= 1
+            # Remove susceptible from heap
+            susceptible = pop!(susceptibles)
 
-            # Update time
-            t += (top(resistances) - Λ) / slope
+            # Create new infected individual
+            new_infectee = make_infected(t, susceptible.id, td, r; exposed=true)
 
-            # Update cumulative infection pressure (and increment heap)
-            Λ = pop!(resistances)
-
-            # Draw times and transmission rate for newly infected
-            βⱼ = rand(dβ)
-            τₑⱼ = rand(dτₑ)
-            τᵢⱼ = rand(dτᵢ)
-            τₛⱼ = rand(dτₛ)
-
-            # Add times events heap
-            push!(event_heap, (t + τₑⱼ, βⱼ, :activation))   # Activation event
-            push!(event_heap, (t + τₑⱼ + τᵢⱼ, βⱼ, :recovery)) # Recovery event
-            push!(event_heap, (t + τₑⱼ + τₛⱼ, βⱼ, :sampling)) # Sampling event
-
-            # Update slope
-            slope += (βⱼ / N)
-
-        elseif top(event_heap)[3] == :activation   # Activation event
-
-            # Update number of exposed and infected
-            E -= 1; I += 1
+            # Add new infected to heap
+            push!(infecteds, new_infectee)
 
             # Update time
+            t += (susceptible.resistance - Λ) / dΛ
 
-
-            # Update number of infected and recovered
-            I -= 1; R += 1
+            # Update number of exposed and susceptibles
+            E += 1; S -= 1
 
             # Update cumulative infection pressure
-            Λ += slope * (top(recoveries)[1] - t)
+            Λ = susceptible.resistance
 
-            # Update time (and increment heap)
-            t, βᵢ = pop!(recoveries)
+            # Update event log
+            push!(events, Transmission(t, new_infectee.id, wsampleindex(transmission_rates)))
 
-            # Decrease slope
-            slope -= (βᵢ / N)
+        else    # Temporal event (activation, recovery, sampling)
+            # Withdraw infected from heap
+            infected = pop!(infecteds)
+
+            # Retrieve next event for this infected
+            event = next_event(infected)
+
+            # Update event log
+            push!(events, event)
+
+            # Update cumulative infection pressure and time
+            Λ += dΛ * (t_next - t)
+            t = t_next
+
+            # Advance head to next event
+            infected.head += 1
+
+            if event isa Activation   # Activation event
+                # Update number of exposed and infected
+                E -= 1; I += 1
+
+                # Activate their transmission rate
+                transmission_rates[infected.id] = infected.traits.transmission_rate
+
+                # Increment slope
+                dΛ += infected.traits.transmission_rate / N
+
+            elseif event isa Recovery || (event isa Sampling && infected.traits.remove_on_sample)   # Removal event
+                # Update number of exposed and infected
+                I -= 1; R += 1
+
+                # Remove their transmission rate
+                transmission_rates[infected.id] = 0.0
+
+                # Decrease slope
+                dΛ -= (infected.traits.transmission_rate / N)
+
+            end
+
+            # If events remain for this infected, push back onto heap
+            !isdone(infected) && push!(infecteds, infected)
+
         end
     end
-    return (S=S, I=I, R=R)
+    return events
 end

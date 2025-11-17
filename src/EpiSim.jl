@@ -30,32 +30,33 @@ export popr!, wsample, wsampleindex, wsampleindex_cols
 
 include("core/events.jl")
 
-export Seeding, Transmission, Sampling, Recovery, Activation
+export Seeding, Transmission, Sampling, Recovery, Activation, Event
 
 
-include("core/simulate.jl")
+# include("core/simulate.jl")
 
-export simulate, eacht, eachsim, eachstate, eachevent, Simulation, Ensemble
-
-
-include("models/sir.jl")
-
-export SIR, SIRAgent, SIRCount
+# export simulate, eacht, eachsim, eachstate, eachevent, Simulation, Ensemble
 
 
-include("models/bd.jl")
+# include("models/sir.jl")
 
-export BD, BDAgent, BDCount
+# export SIR, SIRAgent, SIRCount
 
 
-include("models/mtbd.jl")
+# include("models/bd.jl")
 
-export MTBD, MTBDAgent, MTBDCount, SSBD, SSBDAgent, SSBDCount
+# export BD, BDAgent, BDCount
+
+
+# include("models/mtbd.jl")
+
+# export MTBD, MTBDAgent, MTBDCount, SSBD, SSBDAgent, SSBDCount
 
 
 include("core/sellke.jl")
 
-export sellke
+export sellke, Susceptible, Infected, Agent, TraitDists, Traits
+export isdone, make_infected, next_event, next_time
 
 
 end # module EpiSim

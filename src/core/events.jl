@@ -1,48 +1,46 @@
-abstract type AbstractEvent end
+abstract type Event end
 
 
-@inline host(event::AbstractEvent) = event.host
-@inline time(event::AbstractEvent) = event.time
+@inline host(event::Event) = event.host
+@inline time(event::Event) = event.time
 
 
-Base.isless(e1::AbstractEvent, e2::AbstractEvent) = e1.time < e2.time
+Base.isless(e1::Event, e2::Event) = e1.time < e2.time
 
 
-struct Seeding <: AbstractEvent
+struct Seeding <: Event
     time::Float64
     host::Int
 end
 
 
-struct Transmission <: AbstractEvent
+struct Transmission <: Event
     time::Float64
     host::Int   # <-- infectee
     infector::Int
 end
 
 
-struct Sampling <: AbstractEvent
+struct Sampling <: Event
+    time::Float64
+    host::Int
+end
+
+struct Recovery <: Event
     time::Float64
     host::Int
 end
 
 
-struct Recovery <: AbstractEvent
+struct Activation <: Event
     time::Float64
     host::Int
 end
 
 
-
-struct Activation <: AbstractEvent
-    time::Float64
-    host::Int
-end
-
-
-n_sampled(events::Vector{<:AbstractEvent}) = count(x -> x isa Sampling, events)
-n_recovered(events::Vector{<:AbstractEvent}) = count(x -> x isa Recovery, events)
-n_transmissions(events::Vector{<:AbstractEvent}) = count(x -> x isa Transmission, events)
-n_activations(events::Vector{<:AbstractEvent}) = count(x -> x isa Activation, events)
-n_seeds(events::Vector{<:AbstractEvent}) = count(x -> x isa Seeding, events)
-n_events(events::Vector{<:AbstractEvent}) = length(events)
+n_sampled(events::Vector{<:Event}) = count(x -> x isa Sampling, events)
+n_recovered(events::Vector{<:Event}) = count(x -> x isa Recovery, events)
+n_transmissions(events::Vector{<:Event}) = count(x -> x isa Transmission, events)
+n_activations(events::Vector{<:Event}) = count(x -> x isa Activation, events)
+n_seeds(events::Vector{<:Event}) = count(x -> x isa Seeding, events)
+n_events(events::Vector{<:Event}) = length(events)
