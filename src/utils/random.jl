@@ -6,6 +6,10 @@
 end
 
 
+@inline popr!(v::Vector) =
+    popr!(Random.default_rng(), v)
+
+
 """
     wsample(rng, x, w) -> el
     wsample(x, w)      -> el               # uses default RNG

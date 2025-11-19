@@ -23,6 +23,8 @@ using UnPack
 
 include("core/abstracts.jl")
 
+export State
+
 include("utils/random.jl")
 
 export popr!, wsample, wsampleindex, wsampleindex_cols
@@ -31,6 +33,10 @@ export popr!, wsample, wsampleindex, wsampleindex_cols
 include("core/events.jl")
 
 export Seeding, Transmission, Sampling, Recovery, Activation, Event
+
+include("core/simulation.jl")
+
+export Simulation, Ensemble
 
 
 # include("core/simulate.jl")
@@ -57,6 +63,11 @@ include("core/sellke.jl")
 
 export sellke, Susceptible, Infected, Agent, TraitDists, Traits
 export isdone, make_infected, next_event, next_time
+
+
+include("core/gillespie.jl")
+
+export gillespie
 
 
 end # module EpiSim

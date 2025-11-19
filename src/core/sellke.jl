@@ -72,14 +72,6 @@ function sellke(I₀::Int,
 end
 
 
-@enum State::UInt8 begin
-    SUSCEPTIBLE = 0
-    EXPOSED = 1
-    INFECTIOUS = 2
-    RECOVERED = 3
-end
-
-
 # mutable struct Agent
 #     id::Int
 #     state::State
@@ -150,6 +142,7 @@ end
 Base.rand(td::TraitDists, r::Float64) = Traits(rand(td.dβ), rand(td.dτₑ), rand(td.dτᵢ), rand(td.dτₛ), rand() < r)
 
 
+# TODO: In principle, infecteds could be sampled multiple times before recovery / removal (run loop until either sampling results in recovery or sampling time > recovery time)
 function make_infected(t::Float64, id::Int, td::TraitDists, r::Float64; exposed::Bool)
     tr = rand(td, r)    # Generate traits
 
@@ -281,6 +274,11 @@ function sellke(S₀::Int,
             elseif event isa Recovery || (event isa Sampling && infected.traits.remove_on_sample)   # Removal event
                 # Update number of exposed and infected
                 I -= 1; R += 1
+
+                # Update event log if sampling caused removal
+                if event isa Sampling && infected.traits.remove_on_sample
+                    push!(events, Recovery(t, infected.id))
+                end
 
                 # Remove their transmission rate
                 transmission_rates[infected.id] = 0.0
