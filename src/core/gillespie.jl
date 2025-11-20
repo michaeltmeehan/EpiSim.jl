@@ -80,15 +80,15 @@ function gillespie(S₀::Real,
 
         elseif event_type == 4  # Sampling
             new_sampled = popr!(infectives)
-            push!(events, Sampling(t, new_sampled))  # host id is current infected
 
             # Determine if sampled individual recovers/removes
             if rand() < r
                 I -= 1; R += 1
-                push!(events, Recovery(t, new_sampled))  # host id is current Infected
+                push!(events, SerialSampling(t, new_sampled))  # host id is current Infected
                 push!(states, State(t, S, E, I, R))
             else
                 # If not recovered, put back into infectives
+                push!(events, FossilizedSampling(t, new_sampled))  # host id is current infected
                 push!(infectives, new_sampled)
             end
 

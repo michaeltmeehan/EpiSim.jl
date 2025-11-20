@@ -32,7 +32,7 @@ export popr!, wsample, wsampleindex, wsampleindex_cols
 
 include("core/events.jl")
 
-export Seeding, Transmission, Sampling, Recovery, Activation, Event
+export Seeding, Transmission, Sampling, FossilizedSampling, SerialSampling, Recovery, Activation, Event
 
 include("core/simulation.jl")
 
@@ -68,6 +68,11 @@ export isdone, make_infected, next_event, next_time
 include("core/gillespie.jl")
 
 export gillespie
+
+
+include("utils/processing.jl")
+
+export get_seeds, get_subtree, get_sampled_events, get_subtrees, get_sampled_subtrees
 
 
 end # module EpiSim

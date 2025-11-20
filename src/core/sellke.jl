@@ -158,11 +158,11 @@ function make_infected(t::Float64, id::Int, td::TraitDists, r::Float64; exposed:
 
     if tr.remove_on_sample && t_smp < t_rec
         # sampling causes removal; no recovery event needed
-        push!(events, Sampling(t_smp, id))
+        push!(events, SerialSampling(t_smp, id))
     else
         # optional non-removal sampling (only if it occurs before recovery)
         if t_smp < t_rec
-            push!(events, Sampling(t_smp, id))
+            push!(events, FossilizedSampling(t_smp, id))
         end
         push!(events, Recovery(t_rec, id))
     end
@@ -213,7 +213,10 @@ function sellke(S₀::Int,
     dΛ = sum(transmission_rates) / N
 
     # Initialize event log
-    events = Event[]
+    events = Event[Seeding(0.0, id) for id in 1:(E₀ + I₀)]
+
+    # Initialize state log
+    states = fill(State(t, S, E, I, R), E₀ + I₀)
 
     while E + I > 0
 
@@ -271,14 +274,9 @@ function sellke(S₀::Int,
                 # Increment slope
                 dΛ += infected.traits.transmission_rate / N
 
-            elseif event isa Recovery || (event isa Sampling && infected.traits.remove_on_sample)   # Removal event
-                # Update number of exposed and infected
+            elseif event isa SerialSampling || event isa Recovery   # Sampling with removal or recovery event
+                # Update number of infected and recovered
                 I -= 1; R += 1
-
-                # Update event log if sampling caused removal
-                if event isa Sampling && infected.traits.remove_on_sample
-                    push!(events, Recovery(t, infected.id))
-                end
 
                 # Remove their transmission rate
                 transmission_rates[infected.id] = 0.0
@@ -292,6 +290,9 @@ function sellke(S₀::Int,
             !isdone(infected) && push!(infecteds, infected)
 
         end
+
+        # Push new state to log
+        push!(states, State(t, S, E, I, R))
     end
-    return events
+    return Simulation(states, events, 0)
 end

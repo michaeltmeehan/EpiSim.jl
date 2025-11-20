@@ -1,4 +1,5 @@
 abstract type Event end
+abstract type Sampling <: Event end
 
 
 @inline host(event::Event) = event.host
@@ -20,12 +21,6 @@ struct Transmission <: Event
     infector::Int
 end
 
-
-struct Sampling <: Event
-    time::Float64
-    host::Int
-end
-
 struct Recovery <: Event
     time::Float64
     host::Int
@@ -33,6 +28,18 @@ end
 
 
 struct Activation <: Event
+    time::Float64
+    host::Int
+end
+
+
+struct FossilizedSampling <: Sampling
+    time::Float64
+    host::Int
+end
+
+
+struct SerialSampling <: Sampling
     time::Float64
     host::Int
 end
