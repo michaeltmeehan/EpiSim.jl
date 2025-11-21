@@ -70,9 +70,18 @@ include("core/gillespie.jl")
 export gillespie
 
 
+include("tree/tree.jl")
+
+export Node, InternalNode, Leaf, Root, Binary, Unary
+
+
 include("utils/processing.jl")
 
-export get_seeds, get_subtree, get_sampled_events, get_subtrees, get_sampled_subtrees
+export get_seeds, get_subtree, get_sampled_events, get_subtrees, get_sampled_subtrees, extract_sampled_trees
 
+
+include("birthdeath/likelihood.jl")
+
+export likelihood, p₀, γ, γ₀, γ₁, β
 
 end # module EpiSim

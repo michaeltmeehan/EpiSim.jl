@@ -1,5 +1,5 @@
 
-
+# TODO: Add likelihood calculation
 function gillespie(S₀::Real,
                    E₀::Int,
                    I₀::Int,

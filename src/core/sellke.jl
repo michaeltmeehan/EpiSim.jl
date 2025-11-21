@@ -170,7 +170,7 @@ function make_infected(t::Float64, id::Int, td::TraitDists, r::Float64; exposed:
     return Infected(id, tr, events, 1)
 end
 
-
+# TODO: Add likelihood calculation
 function sellke(S₀::Int, 
                 E₀::Int,
                 I₀::Int, 
