@@ -1,5 +1,6 @@
 abstract type Node end
 abstract type Internal <: Node end
+abstract type Unary <: Internal end
 abstract type Leaf <: Node end
 
 
@@ -26,7 +27,7 @@ struct Binary <: Internal
 end
 
 
-struct SampledUnary <: Internal
+struct SampledUnary <: Unary
     id::Int
     time::Float64
     host::Int
@@ -34,7 +35,7 @@ struct SampledUnary <: Internal
 end
 
 
-struct UnsampledUnary <: Internal
+struct UnsampledUnary <: Unary
     id::Int
     time::Float64
     host::Int

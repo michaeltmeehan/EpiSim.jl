@@ -72,7 +72,7 @@ export gillespie
 
 include("tree/tree.jl")
 
-export Node, InternalNode, Leaf, Root, Binary, Unary
+export Node, Root, Binary, SampledLeaf, SampledUnary, UnsampledUnary
 
 
 include("utils/processing.jl")
