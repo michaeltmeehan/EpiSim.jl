@@ -64,23 +64,15 @@
 #     return get_subtrees(sampled_events, max_id)
 # end
 
-
-# TODO: Optimize (split out sub-functions)
-function extract_sampled_trees(events::Vector{<:Event}, max_id::Int)
+# Forward pass
+function _assign_nodes!(nodes::Vector{Union{Nothing, Node}}, events::Vector{<:Event}, max_id::Int)
     # Initialize vector of tree assignments for each host
     host_tree = zeros(Int, max_id)
-
-    # Initialize vector of nodes for each event
-    nodes = Vector{Union{Nothing, Node}}(undef, length(events))
-    fill!(nodes, nothing)
-
-    # Initialize vector of tree assignments for each node
-    node_tree = zeros(Int, length(events))
 
     # Initialize counter for tree IDs
     tree_count = 0
 
-    # Keep a vector of leading nodes
+    # Keep a vector of leading nodes (one for each tree)
     leading_node = Int[]
     for i in length(events):-1:1
         event = events[i]
@@ -137,8 +129,11 @@ function extract_sampled_trees(events::Vector{<:Event}, max_id::Int)
             end
         end
     end
+end
 
-    # Collect trees
+
+# Backward pass
+function _build_trees(nodes::Vector{Union{Nothing, Node}})
     trees = Vector{Vector{Node}}()
     tree_count = 0
     node_tree = zeros(Int, length(nodes))
@@ -161,3 +156,44 @@ function extract_sampled_trees(events::Vector{<:Event}, max_id::Int)
     end
     return trees
 end
+
+
+function extract_sampled_trees(events::Vector{<:Event}, max_id::Int)
+
+    # Initialize vector of nodes for each event
+    nodes = Vector{Union{Nothing, Node}}(undef, length(events))
+    fill!(nodes, nothing)
+
+    # Assign nodes to events
+    _assign_nodes!(nodes, events, max_id)
+
+    return _build_trees(nodes)
+end
+
+
+# Generic tree tests
+# 1. Each tree should always have one, and only one root node
+# 2. Each node should have a unique ID
+# 3. All nodes should be time-ordered (trees[i] == sort(trees[i]))
+# 4. Each tree should be internally consistent (i.e., child nodes should have later times than parent nodes)
+# 5. Each tree should be connected (i.e., no nodes are orphaned)
+# 6. Children should appear after parents in the node list (i.e., nodes are listed in order of increasing time)
+
+# Tests specific to trees constructed from epidemic events
+# 1. The number of trees should ≤ the number of seeds
+# 2. Events should not be duplicated within or across trees
+# 3. All sampled individuals should be included in the trees
+# 4. Every ancestor of a sampled node should be included in the tree
+# 5. Each host should only appear in one tree
+# 6. If sampling is complete then the number of trees should equal the number of seeds (set recovery to Inf)
+# 7. If there are no sampling events then there should be no trees (set sampling rate to 0)
+# 8. Root/Seeding correspondence: Each tree root should correspond to a seeding event for the same host at the same time
+# 9. Leaf/Sampling correspondence: Each tree leaf should correspond to a sampling event for the same host at the same time
+# 10. Activation/Unary correspondence: Every UnsampledUnary node whose events[id] isa Activation should correspond to an activation event for the same host at the same time
+# 11. Transmission/Binary correspondence: Every Binary node should correspond to a transmission event for the same host at the same time, with left and right children corresponding to infector and infectee respectively
+# 12. Recoviery events should not appear in the trees
+# 13. Host field consistency: For every node, the host field should match the host of the corresponding event
+# 14. Every tree has at least one sampled node
+# 15. Every tree terminates with a sampled leaf node
+# 16. Seeds and hosts without subsequent sampling events do not appear in the trees
+

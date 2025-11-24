@@ -98,7 +98,6 @@ end
 
 
 # TODO: Add root conditioning
-# TODO: Fix tree structure (transmission events do not necessarily correspond to binary nodes in the sampled tree)
 @inline function likelihood(tree::Vector{Node}, λ::Float64, μ::Float64, ψ::Float64, r::Float64)
     t_tip = tree[1].time
     logΦ(t) = log(β(t, t_tip, λ, μ, ψ, r))
