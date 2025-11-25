@@ -33,6 +33,7 @@ export popr!, wsample, wsampleindex, wsampleindex_cols
 include("core/events.jl")
 
 export Seeding, Transmission, Sampling, FossilizedSampling, SerialSampling, Recovery, Activation, Event
+export EventKind, EK_None, EK_Seeding, EK_Transmission, EK_Sampling, EK_FossilizedSampling, EK_SerialSampling, EK_Recovery, EK_Activation
 
 include("core/simulation.jl")
 
@@ -73,7 +74,8 @@ export gillespie
 include("tree/tree.jl")
 
 export Node, Root, Binary, SampledLeaf, SampledUnary, UnsampledUnary
-
+export NodeKind, NK_None, NK_Root, NK_Binary, NK_SampledLeaf, NK_UnsampledLeaf, NK_SampledUnary, NK_UnsampledUnary
+export Tree
 
 include("utils/processing.jl")
 

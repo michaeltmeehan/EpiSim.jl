@@ -52,3 +52,29 @@ end
 
 
 Base.isless(n1::Node, n2::Node) = n1.time < n2.time
+
+
+@enum NodeKind::UInt8 begin
+    NK_None = 0
+    NK_Root = 1
+    NK_Binary = 2
+    NK_UnsampledUnary = 3
+    NK_SampledUnary = 4
+    NK_SampledLeaf = 5
+    NK_UnsampledLeaf = 6
+end
+
+
+mutable struct Tree
+    time::Vector{Float64}   # NaN: none
+    host::Vector{Int}   # 0 : none
+    id::Vector{Int}   # 0 : none
+    left::Vector{Int}   # 0 : none
+    right::Vector{Int}   # 0 : none
+    kind::Vector{NodeKind}  # 0: None, 1: Root, 2: Binary, 3: UnsampledUnary, 4: SampledUnary, 5: SampledLeaf, 6: UnsampledLeaf
+end
+
+
+function Tree(n::Int)
+    return Tree(Vector{Float64}(undef, n), Vector{Int}(undef, n), Vector{Int}(undef, n), Vector{Int}(undef, n), Vector{Int}(undef, n), Vector{NodeKind}(undef, n))
+end

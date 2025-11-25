@@ -117,3 +117,24 @@ end
     end
     return logL
 end
+
+
+@inline function likelihood(tree::Tree, λ::Float64, μ::Float64, ψ::Float64, r::Float64)
+    t_tip = tree.time[1]
+    logΦ(t) = log(β(t, t_tip, λ, μ, ψ, r))
+    E(t) = p₀(t, t_tip, λ, μ, ψ)
+    logλ = log(λ)
+    logψ = log(ψ)
+    log1mr = log(1 - r)
+    logL = 0.0
+    for idx in eachindex(tree.time)
+        if tree.kind[idx] == K_Binary
+            logL += logλ + logΦ(tree.time[idx])
+        elseif tree.kind[idx] == K_SampledLeaf
+            logL += logψ + log((1 - r) * E(tree.time[idx]) + r) - logΦ(tree.time[idx])
+        elseif tree.kind[idx] == K_SampledUnary
+            logL += logψ + log1mr
+        end
+    end
+    return logL
+end
