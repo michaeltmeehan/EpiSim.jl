@@ -66,6 +66,22 @@ n_events(events::Vector{<:Event}) = length(events)
 end
 
 
+const EVENTKIND_LABELS = Dict(
+    EK_None              => "None",
+    EK_Seeding           => "Seeding",
+    EK_Transmission      => "Transmission",
+    EK_Recovery          => "Recovery",
+    EK_Activation        => "Activation",
+    EK_FossilizedSampling => "FossilizedSampling",
+    EK_SerialSampling    => "SerialSampling"
+)
+
+
+function Base.show(io::IO, x::EventKind)
+    print(io, EVENTKIND_LABELS[x])
+end
+
+
 struct EventLog
     time::Vector{Float64}
     host::Vector{Int}

@@ -205,120 +205,259 @@
 #     return all_ids, all_lefts, all_rights, all_kinds
 # end
 
-
 function _assign_nodes(events::EventLog, max_id::Int)
-    # Calculate number of events
     n_events = length(events.time)
-
-    # Initialize vector of tree properties
-    left_children = zeros(Int, n_events)
+    left_children  = zeros(Int, n_events)
     right_children = zeros(Int, n_events)
-    node_kinds = fill(NK_None, n_events)
+    node_kinds     = fill(NK_None, n_events)
 
-    # Initialize vector of tree provisional assignments for each host
-    host_tree_map = zeros(Int, max_id)
+    host_leading = zeros(Int, max_id)  # host → current leading node
 
-    # Initialize counters for leaves (which start as provisional trees)
-    leaf_count = 0
-
-    # Provisional tree IDs
-    tree_ids = Int[]
-
-    # Number of nodes per tree
-    # node_count = Int[]  # length(tree_ids) == length(node_counts)
-
-    # Provisional tree assignment for each node
-    node_tree_map = zeros(Int, n_events)
-
-    # Keep a vector of leading nodes (one for each tree)
-    leading_node = Int[]
-
-    # Iterate backwards through events (i.e., from latest to earliest)
-    for i in n_events:-1:1  # Use i to index nodes and events
-        event_kind = events.kind[i]
+    for i in n_events:-1:1
+        kind = events.kind[i]
         host = events.host[i]
-        host_tree = host_tree_map[host]
-        left, right = 0, 0  # Pre-allocate child indices
-        node_kind = NK_None  # Pre-allocate node kind
 
-        # Check for a leaf event
-        if event_kind == EK_SerialSampling || (event_kind == EK_FossilizedSampling && host_tree == 0)
-            # Start new tree
-            leaf_count += 1; push!(tree_ids, leaf_count)
-            # push!(node_count, 1)
-            # Assign host to tree
-            host_tree_map[host] = leaf_count
-            # Assign node to tree
-            node_tree_map[i] = leaf_count
-            # Mark node as leaf
-            node_kind = NK_SampledLeaf
-            # Add to leading nodes
-            push!(leading_node, i)
-        elseif event_kind == EK_FossilizedSampling
-            # Host has subsequent sampled event; already assigned to tree; add fossil as unary node
-            left = leading_node[host_tree]
-            node_kind = NK_SampledUnary
-            node_tree_map[i] = host_tree
-            leading_node[host_tree] = i
-            # node_count[host_tree] += 1
-        elseif event_kind == EK_Activation && host_tree != 0
-            # Host has already been assigned to tree; add activation as unsampled unary node
-            left = leading_node[host_tree]
-            node_kind = NK_UnsampledUnary
-            node_tree_map[i] = host_tree
-            # Update leading node
-            leading_node[host_tree] = i
-            # node_count[host_tree] += 1
-        elseif event_kind == EK_Transmission
-            infector = events.infector[i]
-            infector_tree = host_tree_map[infector]
-            if host_tree != 0 && infector_tree != 0
-                # Both infector and infectee assigned to tree; add transmission as binary node
-                left, right = leading_node[host_tree], leading_node[infector_tree]
-                node_kind = NK_Binary
-                node_tree_map[i] = host_tree
-                # Merge trees
-                tree_ids[infector_tree] = tree_ids[host_tree]
-                # node_count[host_tree] += node_count[infector_tree] + 1
-                # node_count[infector_tree] = 0
-                host_tree_map[infector] = host_tree
-                leading_node[host_tree] = i
-            elseif host_tree != 0
-                # Only infectee assigned to tree; add transmission as unary node and assign infector to tree
-                left = leading_node[host_tree]
-                node_kind = NK_UnsampledUnary
-                node_tree_map[i] = host_tree
-                leading_node[host_tree] = i
-                # node_count[host_tree] += 1
-                host_tree_map[infector] = host_tree
+        if kind == EK_SerialSampling
+            @assert host_leading[host] == 0  # if your model guarantees one sample per host
+            node_kinds[i] = NK_SampledLeaf
+            host_leading[host] = i
+
+        elseif kind == EK_FossilizedSampling
+            if host_leading[host] == 0
+                node_kinds[i] = NK_SampledLeaf
+                host_leading[host] = i
+            else
+                node_kinds[i]  = NK_SampledUnary
+                left_children[i] = host_leading[host]
+                host_leading[host] = i
             end
-        elseif event_kind == EK_Seeding && host_tree != 0
-            # Host already assigned to tree; add seed as root node
-            left = leading_node[host_tree]
-            node_kind = NK_Root
-            node_tree_map[i] = host_tree
-            # node_count[host_tree] += 1
+
+        elseif kind == EK_Activation && host_leading[host] != 0
+            node_kinds[i]  = NK_UnsampledUnary
+            left_children[i] = host_leading[host]
+            host_leading[host] = i
+
+        elseif kind == EK_Transmission
+            infector = events.infector[i]
+            hL = host_leading[host]
+            iL = host_leading[infector]
+
+            if hL != 0 && iL != 0
+                # both lineages present → binary merge
+                node_kinds[i]  = NK_Binary
+                left_children[i]  = hL
+                right_children[i] = iL
+                # before the transmission (further back in time) only the infector lineage exists
+                host_leading[infector] = i
+                host_leading[host]     = 0
+
+            elseif hL != 0
+                # only host lineage present; propagate it back to infector
+                node_kinds[i]  = NK_UnsampledUnary
+                left_children[i] = hL
+                host_leading[infector] = i
+                host_leading[host]     = 0
+            end
+
+        elseif kind == EK_Seeding && host_leading[host] != 0
+            node_kinds[i]  = NK_Root
+            left_children[i] = host_leading[host]
+            # break
+            host_leading[host] = 0
         end
-        left_children[i] = left
-        right_children[i] = right
-        node_kinds[i] = node_kind
-        # println("Event $i: e_kind=$(event_kind), n_kind=$(node_kind), left=$(left), right=$(right), tree=$(host_tree_map[host]), node_counts=$(node_count)")
     end
 
-    # Clean up node_tree to reflect tree IDs
-    for i in eachindex(node_tree_map)
-        t = node_tree_map[i]
-        if t != 0
-            node_tree_map[i] = tree_ids[t]
-        end
-    end
-
-    return left_children, right_children, node_kinds, node_tree_map #, node_count
+    return left_children, right_children, node_kinds
 end
+
+
+function _label_trees(left_children::Vector{Int},
+                      right_children::Vector{Int},
+                      node_kinds::Vector{NodeKind})
+    n = length(node_kinds)
+    node_tree_map = zeros(Int, n)
+    tree_id = 0
+
+    @inbounds for i in 1:n
+        # start a new component at each root not yet visited
+        if node_kinds[i] == NK_Root && node_tree_map[i] == 0
+            tree_id += 1
+            stack = [i]
+            while !isempty(stack)
+                v = pop!(stack)
+                node_tree_map[v] != 0 && continue
+                node_tree_map[v] = tree_id
+
+                lc = left_children[v]
+                rc = right_children[v]
+                lc != 0 && node_kinds[lc] != NK_None && push!(stack, lc)
+                rc != 0 && node_kinds[rc] != NK_None && push!(stack, rc)
+            end
+        end
+    end
+
+    return node_tree_map
+end
+
+
+# function _compress_single_tree(times::Vector{Float64},
+#                                hosts::Vector{Int},
+#                                left_children::Vector{Int},
+#                                right_children::Vector{Int},
+#                                node_kinds::Vector{NodeKind})
+#     n_nodes = length(left_children)
+#     @assert n_nodes == length(right_children) == length(node_kinds) == length(times) == length(hosts)
+#     node_map = zeros(Int, n_nodes)  # old index → new index
+#     new_index = 0
+
+#     for i in 1:n_nodes
+#         if node_kinds[i] != NK_None
+#             new_index += 1
+#             node_map[i] = new_index
+#         end
+#     end
+
+#     # println("Node map: ", node_map)
+
+#     n_new = new_index
+#     new_time = zeros(Float64, n_new)
+#     new_host = zeros(Int, n_new)
+#     new_left  = zeros(Int, n_new)
+#     new_right = zeros(Int, n_new)
+#     new_kinds = Vector{NodeKind}(undef, n_new)
+
+#     for i in 1:n_nodes
+#         ni = node_map[i]
+#         if ni != 0
+#             new_time[ni] = times[i]
+#             new_host[ni] = hosts[i]
+#             new_kinds[ni] = node_kinds[i]
+#             lc = left_children[i]
+#             rc = right_children[i]
+#             new_left[ni]  = lc == 0 ? 0 : node_map[lc]
+#             new_right[ni] = rc == 0 ? 0 : node_map[rc]
+#         end
+#     end
+
+#     return Tree(new_time, new_host, node_map, new_left, new_right, new_kinds)
+# end
+
+
+
+# function _assign_nodes(events::EventLog, max_id::Int)
+#     # Calculate number of events
+#     n_events = length(events.time)
+
+#     # Initialize vector of tree properties
+#     left_children = zeros(Int, n_events)
+#     right_children = zeros(Int, n_events)
+#     node_kinds = fill(NK_None, n_events)
+
+#     # Initialize vector of tree provisional assignments for each host
+#     host_tree_map = zeros(Int, max_id)
+
+#     # Initialize counters for leaves (which start as provisional trees)
+#     leaf_count = 0
+
+#     # Provisional tree IDs
+#     tree_ids = Int[]
+
+#     # Number of nodes per tree
+#     # node_count = Int[]  # length(tree_ids) == length(node_counts)
+
+#     # Provisional tree assignment for each node
+#     node_tree_map = zeros(Int, n_events)
+
+#     # Keep a vector of leading nodes (one for each tree)
+#     leading_node = Int[]
+
+#     # Iterate backwards through events (i.e., from latest to earliest)
+#     for i in n_events:-1:1  # Use i to index nodes and events
+#         event_kind = events.kind[i]
+#         host = events.host[i]
+#         host_tree = host_tree_map[host]
+#         left, right = 0, 0  # Pre-allocate child indices
+#         node_kind = NK_None  # Pre-allocate node kind
+
+#         # Check for a leaf event
+#         if event_kind == EK_SerialSampling || (event_kind == EK_FossilizedSampling && host_tree == 0)
+#             # Start new tree
+#             leaf_count += 1; push!(tree_ids, leaf_count)
+#             # push!(node_count, 1)
+#             # Assign host to tree
+#             host_tree_map[host] = leaf_count
+#             # Assign node to tree
+#             node_tree_map[i] = leaf_count
+#             # Mark node as leaf
+#             node_kind = NK_SampledLeaf
+#             # Add to leading nodes
+#             push!(leading_node, i)
+#         elseif event_kind == EK_FossilizedSampling
+#             # Host has subsequent sampled event; already assigned to tree; add fossil as unary node
+#             left = leading_node[host_tree]
+#             node_kind = NK_SampledUnary
+#             node_tree_map[i] = host_tree
+#             leading_node[host_tree] = i
+#             # node_count[host_tree] += 1
+#         elseif event_kind == EK_Activation && host_tree != 0
+#             # Host has already been assigned to tree; add activation as unsampled unary node
+#             left = leading_node[host_tree]
+#             node_kind = NK_UnsampledUnary
+#             node_tree_map[i] = host_tree
+#             # Update leading node
+#             leading_node[host_tree] = i
+#             # node_count[host_tree] += 1
+#         elseif event_kind == EK_Transmission
+#             infector = events.infector[i]
+#             infector_tree = host_tree_map[infector]
+#             if host_tree != 0 && infector_tree != 0
+#                 # Both infector and infectee assigned to tree; add transmission as binary node
+#                 left, right = leading_node[host_tree], leading_node[infector_tree]
+#                 node_kind = NK_Binary
+#                 node_tree_map[i] = host_tree
+#                 # Merge trees
+#                 tree_ids[infector_tree] = tree_ids[host_tree]
+#                 # node_count[host_tree] += node_count[infector_tree] + 1
+#                 # node_count[infector_tree] = 0
+#                 host_tree_map[infector] = host_tree
+#                 leading_node[host_tree] = i
+#             elseif host_tree != 0
+#                 # Only infectee assigned to tree; add transmission as unary node and assign infector to tree
+#                 left = leading_node[host_tree]
+#                 node_kind = NK_UnsampledUnary
+#                 node_tree_map[i] = host_tree
+#                 leading_node[host_tree] = i
+#                 # node_count[host_tree] += 1
+#                 host_tree_map[infector] = host_tree
+#             end
+#         elseif event_kind == EK_Seeding && host_tree != 0
+#             # Host already assigned to tree; add seed as root node
+#             left = leading_node[host_tree]
+#             node_kind = NK_Root
+#             node_tree_map[i] = host_tree
+#             # node_count[host_tree] += 1
+#         end
+#         left_children[i] = left
+#         right_children[i] = right
+#         node_kinds[i] = node_kind
+#         println("Event $i: e_kind=$(event_kind), n_kind=$(node_kind), left=$(left), right=$(right), tree=$(host_tree_map[host]), node_tree=$(node_tree_map)")
+#     end
+
+#     # Clean up node_tree to reflect tree IDs
+#     for i in eachindex(node_tree_map)
+#         t = node_tree_map[i]
+#         if t != 0
+#             node_tree_map[i] = tree_ids[t]
+#         end
+#     end
+
+#     return left_children, right_children, node_kinds, node_tree_map #, node_count
+# end
 
 
 function _compute_node_counts(node_tree_map::Vector{Int})
     max_tree_id = maximum(node_tree_map)
+    max_tree_id == 0 && return Int[]
     node_count = zeros(Int, max_tree_id)
     @inbounds for t in node_tree_map
         if t != 0
@@ -330,25 +469,28 @@ end
 
 
 function extract_sampled_trees(events::EventLog, max_id::Int)
+    left, right, node_kinds = _assign_nodes(events, max_id)
 
-   left_children, right_children, node_kinds, node_tree_map = _assign_nodes(events, max_id)
+    node_tree_map = _label_trees(left, right, node_kinds)
+    node_counts = _compute_node_counts(node_tree_map)
 
-   node_counts = _compute_node_counts(node_tree_map)
-
-    trees = [Tree(n) for n in node_counts]
+    trees  = [Tree(n) for n in node_counts]
     nextpos = ones(Int, length(trees))
-    for i in eachindex(node_tree_map)
-        tree_id = node_tree_map[i]
-        tree_id == 0 && continue
-        k = nextpos[tree_id]
-        nextpos[tree_id] += 1
-        tree = trees[tree_id]
-        tree.time[k] = events.time[i]
-        tree.host[k] = events.host[i]
-        tree.id[k] = i
-        tree.left[k] = left_children[i]
-        tree.right[k] = right_children[i]
-        tree.kind[k] = node_kinds[i]
+
+    @inbounds for i in eachindex(node_tree_map)
+        t = node_tree_map[i]
+        t == 0 && continue
+
+        k = nextpos[t]
+        nextpos[t] += 1
+
+        tr = trees[t]
+        tr.time[k]  = events.time[i]
+        tr.host[k]  = events.host[i]
+        tr.id[k]    = i
+        tr.left[k]  = left[i]
+        tr.right[k] = right[i]
+        tr.kind[k]  = node_kinds[i]
     end
 
     return trees

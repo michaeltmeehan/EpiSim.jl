@@ -65,6 +65,21 @@ Base.isless(n1::Node, n2::Node) = n1.time < n2.time
 end
 
 
+const NODEKIND_LABELS = Dict(
+    NK_None           => "None",
+    NK_Root           => "Root",
+    NK_Binary         => "Binary",
+    NK_UnsampledUnary => "UnsampledUnary",
+    NK_SampledUnary   => "SampledUnary",
+    NK_SampledLeaf    => "SampledLeaf",
+    NK_UnsampledLeaf  => "UnsampledLeaf"
+)
+
+
+function Base.show(io::IO, x::NodeKind)
+    print(io, NODEKIND_LABELS[x])
+end
+
 mutable struct Tree
     time::Vector{Float64}   # NaN: none
     host::Vector{Int}   # 0 : none
@@ -78,3 +93,7 @@ end
 function Tree(n::Int)
     return Tree(Vector{Float64}(undef, n), Vector{Int}(undef, n), Vector{Int}(undef, n), Vector{Int}(undef, n), Vector{Int}(undef, n), Vector{NodeKind}(undef, n))
 end
+
+
+Base.length(t::Tree) = length(t.time)
+
