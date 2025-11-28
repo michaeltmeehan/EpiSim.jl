@@ -36,6 +36,24 @@ end
 
 Base.length(el::EventLog) = length(el.time)
 
+
+function EventLog(n::Int)
+    return EventLog(zeros(Float64, n), collect(1:n), zeros(Int, n), fill(EK_Seeding, n))
+end
+
+
+function update_event_log!(el::EventLog,
+                              t::Float64,
+                              host::Int,
+                              infector::Int,
+                              kind::EventKind)
+    push!(el.time, t)
+    push!(el.host, host)
+    push!(el.infector, infector)
+    push!(el.kind, kind)
+end
+
+
 # Write iterators for time, host, infector, kind
 eachtime(el::EventLog) = (el.time[i] for i in 1:length(el))
 eachhost(el::EventLog) = (el.host[i] for i in 1:length(el))

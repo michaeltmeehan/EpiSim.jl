@@ -9,6 +9,25 @@ _to_dist(x::Union{Float64, Distribution}, exp_default=false) = x isa Distributio
     SK_Infected = 3
     SK_Removed = 4
 end
+# State kinds:
+# SK_Susceptible: in susceptibles heap, resistance[i] < ∞, β[i] = 0
+# SK_Exposed: in infecteds heap, β[i] = 0, next_event = EK_Activation
+# SK_Infected: in infecteds heap, β[i] > 0, next_event ∈ {EK_FossilizedSampling, EK_SerialSampling, EK_Recovery}
+# SK_Removed: never in any heap, β[i] = 0, next_event = EK_None
+
+
+const STATEKIND_LABELS = Dict(
+    SK_None              => "None",
+    SK_Susceptible       => "Susceptible",
+    SK_Exposed          => "Exposed",
+    SK_Infected         => "Infected",
+    SK_Removed          => "Removed"
+)
+
+
+function Base.show(io::IO, x::StateKind)
+    print(io, STATEKIND_LABELS[x])
+end
 
 
 struct TraitDists
@@ -30,14 +49,11 @@ end
 mutable struct Population
     kind::Vector{StateKind}   # 0: None, 1: Susceptible, 2: Exposed, 3: Infected, 4: Removed
     resistance::Vector{Float64}   # only for Susceptible; Inf otherwise
-    transmission_rate::Vector{Float64}   # only for Infected; 0.0 otherwise
-    incubation_period::Vector{Float64}   # only for Exposed; 0.0 otherwise
-    infectious_period::Vector{Float64}   # only for Infected; 0.0 otherwise
-    sampling_period::Vector{Float64}   # only for Infected; 0.0 otherwise
+    β::Vector{Float64}   # transmission rate; only for Infected; 0.0 otherwise
+    τₑ::Vector{Float64}   # incubation period; only for Exposed; 0.0 otherwise
+    τᵢ::Vector{Float64}   # infectious period; only for Infected; 0.0 otherwise
+    τₛ::Vector{Float64}   # time since activation to next sample; only for Infected; 0.0 otherwise
     t_infection::Vector{Float64}   # only for Exposed and Infected; NaN otherwise
-    t_activation::Vector{Float64}   # only for Exposed; NaN otherwise
-    t_recovery::Vector{Float64}   # only for Infected; NaN
-    t_sampling::Vector{Float64}   # only for Infected; NaN otherwise
     next_event::Vector{EventKind}
     next_event_time::Vector{Float64}
 end
@@ -51,110 +67,182 @@ function Population(N::Int)
                       zeros(Float64, N),
                       zeros(Float64, N),
                       fill(NaN, N),
-                      fill(NaN, N),
-                      fill(NaN, N),
-                      fill(NaN, N),
                       fill(EK_None, N),
                       fill(Inf, N)
                       )
 end
 
 
-function schedule_host!(pop::Population,
-                        i::Int,
-                        t::Float64,
+mutable struct ActiveList
+    ids::Vector{Int}
+    β::Vector{Float64}
+    pos_in_active::Vector{Int}  # position of each host in active_ids and active_β; 0 if not active
+    total_β::Float64
+end
+
+
+function ActiveList(N::Int)
+    return ActiveList(Int[], Float64[], zeros(Int, N), 0.0)
+end
+
+
+function add_active!(actives::ActiveList,
+                     id::Int,
+                     β::Float64)
+
+    push!(actives.ids, id)
+    push!(actives.β, β)
+    actives.pos_in_active[id] = length(actives.ids)
+    actives.total_β += β
+    return
+end
+
+
+function remove_active!(actives::ActiveList,
+                        id::Int)
+
+    actives.total_β -= actives.β[actives.pos_in_active[id]]
+    idx = actives.pos_in_active[id]
+    @assert idx != 0 "remove_active! called for non-active host $id"
+    last_id = actives.ids[end]
+    last_β = actives.β[end]
+
+    # Swap with last element
+    actives.ids[idx] = last_id
+    actives.β[idx] = last_β
+    actives.pos_in_active[last_id] = idx
+
+    # Pop last element
+    pop!(actives.ids)
+    pop!(actives.β)
+    actives.pos_in_active[id] = 0
+    return
+end
+
+
+function expose_host!(pop::Population,
+                      id::Int,
+                      t::Float64,
+                      td::TraitDists)
+
+    @unpack kind, resistance, β, τₑ, τᵢ, τₛ, 
+            t_infection, next_event, next_event_time = pop
+
+    t_infection[id] = t
+    kind[id] = SK_Exposed
+    τₑ[id] = rand(td.dτₑ)
+    next_event[id] = EK_Activation
+    next_event_time[id] = t + τₑ[id]
+end
+
+
+function schedule_sampling(τₑ::Float64,
+                           τᵢ::Float64,
+                           τₛ::Float64,
+                           t_infection::Float64,
+                           r::Float64)
+    t_activation = t_infection + τₑ
+    if τₛ < τᵢ
+        # Sampling within infectious period
+        if rand() < r
+            next_event = EK_SerialSampling
+        else
+            next_event = EK_FossilizedSampling
+        end
+        next_event_time = t_activation + τₛ
+    else
+        # Sampling after infectious period
+        next_event = EK_Recovery
+        next_event_time = t_activation + τᵢ
+    end
+    return next_event, next_event_time
+end
+
+
+function activate_host!(pop::Population,
+                        id::Int,
                         td::TraitDists,
-                        r::Float64;
-                        exposed::Bool)
+                        r::Float64,
+                        active::ActiveList)
 
-    pop.transmission_rate[i] = rand(td.dβ)
-    pop.incubation_period[i] = rand(td.dτₑ)
-    pop.infectious_period[i] = rand(td.dτᵢ)
-    pop.sampling_period[i] = rand(td.dτₛ)
+    @unpack kind, resistance, β, τₑ, τᵢ, τₛ, 
+            t_infection, next_event, next_event_time = pop
 
-    pop.t_infection[i] = t
-    if exposed
-        pop.kind[i] = SK_Exposed
-        pop.next_event[i] = EK_Activation
-        pop.next_event_time[i] = pop.t_activation[i] = t + pop.incubation_period[i]
-    else
-        pop.kind[i] = SK_Infected
-        pop.t_activation[i] = t
-        if pop.infectious_period[i] < pop.sampling_period[i]
-            pop.next_event[i] = EK_Recovery
-            pop.next_event_time[i] = t + pop.infectious_period[i]
-        elseif rand() < r
-            pop.next_event[i] = EK_SerialSampling
-            pop.next_event_time[i] = t + pop.sampling_period[i]
-        else
-            pop.next_event[i] = EK_FossilizedSampling
-            pop.next_event_time[i] = t + pop.sampling_period[i]
-        end
-    end
+    kind[id] = SK_Infected
+    β[id] = rand(td.dβ)
+    τᵢ[id] = rand(td.dτᵢ)
+    τₛ[id] = rand(td.dτₛ)
+    next_event[id], next_event_time[id] = schedule_sampling(τₑ[id], τᵢ[id], τₛ[id], t_infection[id], r)
+
+    add_active!(active, id, β[id])
+    return
 end
 
 
-function advance_host!(pop::Population, id::Int, td::TraitDists, r::Float64)
-    event_kind = pop.next_event[id]
-    t = pop.next_event_time[id]
-    if event_kind == EK_Activation
-        pop.kind[id] = SK_Infected
-        pop.t_activation[id] = t
-        if pop.infectious_period[id] < pop.sampling_period[id]
-            pop.next_event[id] = EK_Recovery
-            pop.next_event_time[id] = pop.t_activation[id] + pop.infectious_period[id]
-        elseif rand() < r
-            pop.next_event[id] = EK_SerialSampling
-            pop.next_event_time[id] = pop.t_activation[id] + pop.sampling_period[id]
-        else
-            pop.next_event[id] = EK_FossilizedSampling
-            pop.next_event_time[id] = pop.t_activation[id] + pop.sampling_period[id]
-        end
-    elseif event_kind == EK_SerialSampling || event_kind == EK_Recovery
-        pop.kind[id] = SK_Removed
-        pop.transmission_rate[id] = 0.0
-        pop.next_event[id] = EK_None
-        pop.next_event_time[id] = Inf
-        if event_kind == EK_SerialSampling
-            pop.t_sampling[id] = t
-        else
-            pop.t_recovery[id] = t
-        end
-    elseif event_kind == EK_FossilizedSampling
-        pop.t_sampling[id] = t
-        # Draw a new sampling interval (gap) and update time since activation
-        Δτₛ = rand(td.dτₛ)
-        pop.sampling_period[id] += Δτₛ  # now: time since activation for next sample
+function fossilize_host!(pop::Population,
+                        id::Int,
+                        td::TraitDists,
+                        r::Float64)
 
-        if pop.sampling_period[id] < pop.infectious_period[id]
-            # still within infectious window
-            if rand() < r
-                pop.next_event[id] = EK_SerialSampling
-            else
-                pop.next_event[id] = EK_FossilizedSampling
-            end
-            pop.next_event_time[id] =
-                pop.t_activation[id] + pop.sampling_period[id]
-        else
-            pop.next_event[id]      = EK_Recovery
-            pop.next_event_time[id] =
-                pop.t_activation[id] + pop.infectious_period[id]
-        end
-    elseif event_kind == EK_None
-        # Do nothing
-    else
-        error("Unknown event kind: $event_kind")
-    end
+    @unpack kind, resistance, β, τₑ, τᵢ, τₛ, 
+            t_infection, next_event, next_event_time = pop
+
+    # Draw a new sampling interval (gap) and update time since activation
+    Δτₛ = rand(td.dτₛ)
+    τₛ[id] += Δτₛ  # now: time since activation for next sample
+    next_event[id], next_event_time[id] = schedule_sampling(τₑ[id], τᵢ[id], τₛ[id], t_infection[id], r)
 end
 
 
-# susceptibility heap: (resistance, host_index)
-const SusKey = Tuple{Float64,Int}
-# infected heap: (next_event_time, host_index)
-const InfKey = Tuple{Float64,Int}
+function deactivate_host!(pop::Population,
+                        id::Int,
+                        actives::ActiveList)
+
+    @unpack kind, resistance, β, τₑ, τᵢ, τₛ, 
+            t_infection, next_event, next_event_time = pop
+
+    kind[id] = SK_Removed
+    actives.total_β -= β[id]
+    β[id] = 0.0
+    next_event[id] = EK_None
+    next_event_time[id] = Inf
+
+    remove_active!(actives, id)
+    return
+end
+
+
+struct SusKey
+    resistance::Float64
+    id::Int
+end
+
+Base.isless(a::SusKey, b::SusKey) = a.resistance < b.resistance
+
+struct InfKey
+    next_event_time::Float64
+    id::Int
+end
+
+Base.isless(a::InfKey, b::InfKey) = a.next_event_time < b.next_event_time
+
+
+function sample_infector(actives::ActiveList)
+    @assert actives.total_β > 0.0 "sample_infector called with total_β = 0"
+    u = rand() * actives.total_β
+    cumulative = 0.0
+    @inbounds for idx in eachindex(actives.β)
+        cumulative += actives.β[idx]
+        if cumulative ≥ u
+            return actives.ids[idx]
+        end
+    end
+    return actives.ids[end]  # Fallback
+end
 
 
 # TODO: Add likelihood calculation
+# TODO: Implement in-place allocations of population
 function sellke(S₀::Int, 
                 E₀::Int,
                 I₀::Int, 
@@ -181,39 +269,45 @@ function sellke(S₀::Int,
     pop = Population(N)
 
     # Assign resistances to susceptibles
-    susceptibles = BinaryMinHeap{SusKey}([(pop.resistance[id], id) for id in (E₀ + I₀ + 1):N])
+    susceptibles = BinaryMinHeap{SusKey}([SusKey(pop.resistance[id], id) for id in (E₀ + I₀ + 1):N])
 
     # Initialize exposed individuals
     for id in 1:E₀
-        schedule_host!(pop, id, t, td, r; exposed=true)
+        expose_host!(pop, id, t, td)
     end
+
+    # Initialize list of active infectors
+    actives = ActiveList(N)
 
     # Initialize infected individuals
     for id in (E₀ + 1):(E₀ + I₀)
-        schedule_host!(pop, id, t, td, r; exposed=false)
+        pop.t_infection[id] = t
+        activate_host!(pop, id, td, r, actives)
     end
 
-    infecteds = BinaryMinHeap{InfKey}([(pop.next_event_time[id], id) for id in 1:(E₀ + I₀)])
+    # Initialize infected event heap
+    infecteds = BinaryMinHeap{InfKey}([InfKey(pop.next_event_time[id], id) for id in 1:(E₀ + I₀)])
 
     # Calculate initial slope (i.e., cumulative transmission rate)
-    dΛ = sum(pop.transmission_rate[(E₀+1):(E₀ + I₀)]) / N
+    dΛ = actives.total_β / N
 
     # Initialize event log components with seeding events
-    times = zeros(Float64, E₀+I₀)
-    hosts = collect(1:(E₀+I₀))
-    infectors = zeros(Int, E₀+I₀)
-    kinds = fill(EK_Seeding, E₀+I₀)    
+    el = EventLog(E + I)
 
     while E + I > 0
 
         # Look up time for next infected event
-        t_next = top(infecteds)[1]
+        t_next = top(infecteds).next_event_time
+
+        @assert t_next ≥ t "Next infected event time $t_next is earlier than current time $t"
 
         # Work out whether infection or temporal event occurs next
-        if !isempty(susceptibles) && top(susceptibles)[1] ≤ Λ + dΛ * (t_next - t) # Infection event
+        if !isempty(susceptibles) && top(susceptibles).resistance ≤ Λ + dΛ * (t_next - t) # Infection event
+
+            @assert dΛ > 0.0 "Infection event triggered with zero force of infection"
 
             # Remove susceptible from heap
-            resistance, id = pop!(susceptibles)
+            @unpack resistance, id = pop!(susceptibles)
 
             # Update time
             t += (resistance - Λ) / dΛ
@@ -225,29 +319,21 @@ function sellke(S₀::Int,
             Λ = resistance
 
             # Create new exposed individual
-            schedule_host!(pop, id, t, td, r; exposed=true)
+            expose_host!(pop, id, t, td)
 
             # Add new infected to heap
-            push!(infecteds, (pop.next_event_time[id], id))
+            push!(infecteds, InfKey(pop.next_event_time[id], id))
 
-            # Update event log
-            push!(times, t)
-            push!(hosts, id)
-            push!(infectors, wsampleindex(pop.transmission_rate))   # TODO: assign infector ID
-            push!(kinds, EK_Transmission)
+            update_event_log!(el, t, id, sample_infector(actives), EK_Transmission)
 
         else    # Temporal event (activation, recovery, sampling)
             # Withdraw infected from heap
-            t_next, id = pop!(infecteds)
+            @unpack next_event_time, id = pop!(infecteds)
 
             # Retrieve scheduled event for this infected
             scheduled_event = pop.next_event[id]
 
-            # Update event log
-            push!(times, t_next)
-            push!(hosts, id)
-            push!(infectors, 0)
-            push!(kinds, scheduled_event)
+            update_event_log!(el, t_next, id, 0, scheduled_event)
 
             # Update cumulative infection pressure and time
             Λ += dΛ * (t_next - t)
@@ -257,25 +343,26 @@ function sellke(S₀::Int,
                 # Update number of exposed and infected
                 E -= 1; I += 1
 
+                # Activate host
+                activate_host!(pop, id, td, r, actives)
+
                 # Increment slope
-                dΛ += pop.transmission_rate[id] / N
+                dΛ = actives.total_β / N
 
             elseif scheduled_event == EK_SerialSampling || scheduled_event == EK_Recovery   # Sampling with removal or recovery event
                 # Update number of infected and recovered
                 I -= 1; R += 1
-
-                # Decrease slope
-                dΛ -= (pop.transmission_rate[id] / N)
-
+                deactivate_host!(pop, id, actives)
+                dΛ = actives.total_β / N
+            elseif scheduled_event == EK_FossilizedSampling
+                # No change in counts, no change in slope
+                fossilize_host!(pop, id, td, r)
             end
 
-            # Advance host state
-            advance_host!(pop, id, td, r)
-
             # If events remain for this infected, push back onto heap
-            pop.next_event[id] != EK_None && push!(infecteds, (pop.next_event_time[id], id))
+            pop.next_event[id] != EK_None && push!(infecteds, InfKey(pop.next_event_time[id], id))
 
         end
     end
-    return EventLog(times, hosts, infectors, kinds)
+    return el
 end

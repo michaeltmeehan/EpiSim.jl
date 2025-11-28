@@ -21,9 +21,9 @@ using StatsBase
 using UnPack
 
 
-include("core/abstracts.jl")
+# include("core/abstracts.jl")
 
-export State
+# export State
 
 include("utils/random.jl")
 
@@ -32,12 +32,12 @@ export popr!, wsample, wsampleindex, wsampleindex_cols
 
 include("core/events.jl")
 
-export Seeding, Transmission, Sampling, FossilizedSampling, SerialSampling, Recovery, Activation, Event
+# export Seeding, Transmission, Sampling, FossilizedSampling, SerialSampling, Recovery, Activation, Event
 export EventKind, EK_None, EK_Seeding, EK_Transmission, EK_Sampling, EK_FossilizedSampling, EK_SerialSampling, EK_Recovery, EK_Activation
 
-include("core/simulation.jl")
+# include("core/simulation.jl")
 
-export Simulation, Ensemble
+# export Simulation, Ensemble
 
 
 # include("core/simulate.jl")
@@ -62,7 +62,7 @@ export Simulation, Ensemble
 
 include("core/sellke.jl")
 
-export sellke, Susceptible, Infected, Agent, TraitDists, Traits
+export sellke, TraitDists, Traits
 export isdone, make_infected, next_event, next_time
 
 

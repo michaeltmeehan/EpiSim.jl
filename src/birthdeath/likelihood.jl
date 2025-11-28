@@ -98,25 +98,25 @@ end
 
 
 # TODO: Add root conditioning
-@inline function likelihood(tree::Vector{Node}, λ::Float64, μ::Float64, ψ::Float64, r::Float64)
-    t_tip = tree[1].time
-    logΦ(t) = log(β(t, t_tip, λ, μ, ψ, r))
-    E(t) = p₀(t, t_tip, λ, μ, ψ)
-    logλ = log(λ)
-    logψ = log(ψ)
-    log1mr = log(1 - r)
-    logL = 0.0
-    for node in tree
-        if node isa Binary
-            logL += logλ + logΦ(node.time)
-        elseif node isa SampledLeaf
-            logL += logψ + log((1 - r) * E(node.time) + r) - logΦ(node.time)
-        elseif node isa SampledUnary
-            logL += logψ + log1mr
-        end
-    end
-    return logL
-end
+# @inline function likelihood(tree::Vector{Node}, λ::Float64, μ::Float64, ψ::Float64, r::Float64)
+#     t_tip = tree[1].time
+#     logΦ(t) = log(β(t, t_tip, λ, μ, ψ, r))
+#     E(t) = p₀(t, t_tip, λ, μ, ψ)
+#     logλ = log(λ)
+#     logψ = log(ψ)
+#     log1mr = log(1 - r)
+#     logL = 0.0
+#     for node in tree
+#         if node isa Binary
+#             logL += logλ + logΦ(node.time)
+#         elseif node isa SampledLeaf
+#             logL += logψ + log((1 - r) * E(node.time) + r) - logΦ(node.time)
+#         elseif node isa SampledUnary
+#             logL += logψ + log1mr
+#         end
+#     end
+#     return logL
+# end
 
 
 @inline function likelihood(tree::Tree, λ::Float64, μ::Float64, ψ::Float64, r::Float64)
