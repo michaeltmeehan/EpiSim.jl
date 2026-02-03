@@ -45,19 +45,8 @@ export EventKind, EK_None, EK_Seeding, EK_Transmission, EK_Sampling, EK_Fossiliz
 # export simulate, eacht, eachsim, eachstate, eachevent, Simulation, Ensemble
 
 
-# include("models/sir.jl")
-
-# export SIR, SIRAgent, SIRCount
-
-
-# include("models/bd.jl")
-
-# export BD, BDAgent, BDCount
-
-
-# include("models/mtbd.jl")
-
-# export MTBD, MTBDAgent, MTBDCount, SSBD, SSBDAgent, SSBDCount
+include("core/abstracts.jl")
+export State, get_prevalence
 
 
 include("core/sellke.jl")

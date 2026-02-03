@@ -63,26 +63,63 @@ function Q_mul!(out::Vector{Float64}, v::Vector{Float64}, N::Int, α::Float64, �
 end
 
 
-β = 2.
+tvec = collect(0.:1.:5.)
+β = 5.
 α = 1.
-N = 4
-S0 = 3
+N = 10
+S0 = 9
 I0 = 1
 Q_bands = construct_sir_band_matrices(N)
 p0 = zeros((N+1)^2)
 p0[I0 + S0 * (N+1) + 1] = 1.0
 y = similar(p0)
-
-
 γ = (N-1)*α + max((N-1)*β, α)
+
+theoretical_pop_distribution = reduce(vcat, [aggregate_p(uniformize(p0, t, γ, Q_mul!, N, α, β, Q_bands), N)' for t in tvec])
+
+
+n_sim = 100_000
+empirical_distribution = zeros(length(tvec), N+1)
+recovery_times = Float64[]
+for i in 1:n_sim
+    states, events = sellke(S0, 0, I0, Dirac(β), Dirac(0.), Exponential(1. / α), Dirac(Inf), 0.0)
+    prevalence = get_prevalence(states, tvec)
+    for (j, t) in enumerate(tvec)
+        empirical_distribution[j, prevalence[j] + 1] += 1
+    end
+
+    infection_times = zeros(N)
+    for i in 1:length(events.time)
+        kind = events.kind[i]
+        if kind == EK_Seeding || kind == EK_Transmission
+            infection_times[events.host[i]] = events.time[i]
+        elseif kind == EK_Recovery
+            push!(recovery_times, events.time[i] - infection_times[events.host[i]])
+        end
+    end
+end
+empirical_distribution ./= n_sim
+
+
+
+using StatsPlots, Distributions
+
+qqplot(
+    Exponential(1 / α),          # or Exponential(mean(x))
+    recovery_times,
+    xlabel = "Theoretical quantiles (Exponential)",
+    ylabel = "Sample quantiles",
+    legend = false
+)
+
+
 
 model = SIRModel(N=N, I=I0, transmission_rate=β, recovery_rate=α, sampling_rate=0.0)
 rng = Random.MersenneTwister(1234)
 
 ens = simulate(rng, model, 100_000, stop_condition = (state) -> state.t > 5.)
 
-tvec = collect(0.:1.:5.)
+
 empirical_prevalence = get_prevalence(ens, tvec)
 n_max = maximum(empirical_prevalence)
 empirical_pop_distribution = get_distribution(empirical_prevalence, n_max)
-theoretical_pop_distribution = reduce(vcat, [aggregate_p(uniformize(p0, t, γ, Q_mul!, N, α, β, Q_bands), N)' for t in tvec])

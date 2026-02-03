@@ -38,11 +38,12 @@ struct TraitDists
 end
 
 
+# TODO: Fix up function signature to accept better defaults for _to_dist
 function TraitDists(β::Union{Float64, Distribution},
                     τₑ::Union{Float64, Distribution},
                     τᵢ::Union{Float64, Distribution},
                     τₛ::Union{Float64, Distribution})
-    return TraitDists(_to_dist(β), _to_dist(τₑ, true), _to_dist(τᵢ, true), _to_dist(τₛ, true))
+    return TraitDists(_to_dist(β), _to_dist(τₑ, false), _to_dist(τᵢ, true), _to_dist(τₛ, false))
 end
 
 
@@ -86,6 +87,7 @@ function ActiveList(N::Int)
 end
 
 
+# TODO: Rename pos_in_active to active_idx
 function add_active!(actives::ActiveList,
                      id::Int,
                      β::Float64)
@@ -98,12 +100,13 @@ function add_active!(actives::ActiveList,
 end
 
 
+# TODO: Replace chunk with popr!()
 function remove_active!(actives::ActiveList,
                         id::Int)
 
-    actives.total_β -= actives.β[actives.pos_in_active[id]]
     idx = actives.pos_in_active[id]
     @assert idx != 0 "remove_active! called for non-active host $id"
+    actives.total_β -= actives.β[actives.pos_in_active[id]]
     last_id = actives.ids[end]
     last_β = actives.β[end]
 
@@ -202,12 +205,12 @@ function deactivate_host!(pop::Population,
             t_infection, next_event, next_event_time = pop
 
     kind[id] = SK_Removed
-    actives.total_β -= β[id]
+    remove_active!(actives, id)
+    # actives.total_β -= β[id]
     β[id] = 0.0
     next_event[id] = EK_None
     next_event_time[id] = Inf
 
-    remove_active!(actives, id)
     return
 end
 
@@ -292,7 +295,11 @@ function sellke(S₀::Int,
     dΛ = actives.total_β / N
 
     # Initialize event log components with seeding events
-    el = EventLog(E + I)
+    events = EventLog(E + I)
+
+    # Initialize state log
+    initial_state = State(t, S, E, I, R)
+    states = [initial_state]
 
     while E + I > 0
 
@@ -324,7 +331,7 @@ function sellke(S₀::Int,
             # Add new infected to heap
             push!(infecteds, InfKey(pop.next_event_time[id], id))
 
-            update_event_log!(el, t, id, sample_infector(actives), EK_Transmission)
+            update_event_log!(events, t, id, sample_infector(actives), EK_Transmission)
 
         else    # Temporal event (activation, recovery, sampling)
             # Withdraw infected from heap
@@ -333,7 +340,7 @@ function sellke(S₀::Int,
             # Retrieve scheduled event for this infected
             scheduled_event = pop.next_event[id]
 
-            update_event_log!(el, t_next, id, 0, scheduled_event)
+            update_event_log!(events, t_next, id, 0, scheduled_event)
 
             # Update cumulative infection pressure and time
             Λ += dΛ * (t_next - t)
@@ -363,6 +370,8 @@ function sellke(S₀::Int,
             pop.next_event[id] != EK_None && push!(infecteds, InfKey(pop.next_event_time[id], id))
 
         end
+        # Push new state to log
+        push!(states, State(t, S, E, I, R))
     end
-    return el
+    return states, events
 end
