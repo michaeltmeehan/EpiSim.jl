@@ -100,7 +100,6 @@ function add_active!(actives::ActiveList,
 end
 
 
-# TODO: Replace chunk with popr!()
 function remove_active!(actives::ActiveList,
                         id::Int)
 

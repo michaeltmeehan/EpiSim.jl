@@ -1,9 +1,2 @@
-using EpiSim
-using DataFrames
-using DataFramesMeta
-using Lazy
-using Parameters
-using RecursiveArrayTools
-using StatsBase
-using UnPack
 using Test
+@test true
