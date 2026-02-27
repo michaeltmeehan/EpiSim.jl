@@ -1,2 +1,3 @@
 using Test
-@test true
+
+include("public_api_smoke_test.jl")
