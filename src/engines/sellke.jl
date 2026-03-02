@@ -105,7 +105,7 @@ function simulate(::SellkeEngine,
                     τe = draw_tau_e(rng, model)
                     push!(temporal, (t + τe, Activation, sid))
                 else
-                    activate_host!(rng, temporal, model, sid, t,
+                    total_beta = activate_host!(rng, temporal, model, sid, t,
                                    β, active_ids, total_beta)
                 end
 

@@ -28,6 +28,9 @@ include("postprocess/trajectories.jl")
 include("postprocess/summaries.jl")
 include("postprocess/ensemble_stats.jl")
 
+# Differential uniformization
+include("benchmark/du/du.jl")
+using .DU: du_infected_distribution, SIRGenerator
 
 # =========================================
 # Exports
@@ -42,6 +45,8 @@ export SEIRModel,
        reconstruct_trajectory,
        reconstruct_on_grid,
        infected_distribution_matrix,
-       StateTrajectory
+       StateTrajectory,
+       du_infected_distribution,
+       SIRGenerator
 
 end

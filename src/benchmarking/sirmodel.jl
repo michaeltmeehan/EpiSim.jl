@@ -66,8 +66,8 @@ end
 tvec = collect(0.:1.:5.)
 β = 2.
 α = 1.
-N = 10
-S0 = 9
+N = 5
+S0 = 4
 I0 = 1
 Q_bands = construct_sir_band_matrices(N)
 p0 = zeros((N+1)^2)
