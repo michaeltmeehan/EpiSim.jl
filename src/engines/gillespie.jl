@@ -1,16 +1,18 @@
 # =========================================
-# Gillespie engine (Markovian, count-based)
+# Gillespie engine (Markovian count-based)
 # =========================================
 
+using Distributions
 using Random
 
 function simulate(::GillespieEngine,
                   model::AbstractEpidemicModel,
                   S0::Int,
                   E0::Int,
-                  I0::Int)
+                  I0::Int;
+                  rng::AbstractRNG = Random.default_rng())
 
-    # Enforce Markovian assumptions
+    # Enforce exponential assumptions
     if !(model.dτi isa Exponential)
         error("GillespieEngine requires exponential infectious period")
     end
@@ -25,28 +27,24 @@ function simulate(::GillespieEngine,
     S = S0
     E = E0
     I = I0
-    R = 0
 
     t = 0.0
-    next_host_id = N + 1
-
     log = EventLog()
 
-    # Seed initial infected
+    # Log seeding
     for id in 1:(E0 + I0)
         push_event!(log, t, Seeding, id, 0)
     end
 
+    β̄ = mean(model.dβ)
+
+    # For ID assignment
+    next_id = N + 1
+
     while E + I > 0
 
-        # Infection rate
-        β̄ = mean(model.dβ)  # Approximate average β
         λ_inf = β̄ * S * I / N
-
-        # Activation rate (if latent stage)
         λ_act = has_latent_stage(model) ? (E / mean(model.dτe)) : 0.0
-
-        # Removal rate
         λ_rem = I / mean(model.dτi)
 
         λ_total = λ_inf + λ_act + λ_rem
@@ -56,14 +54,14 @@ function simulate(::GillespieEngine,
         end
 
         # Time step
-        Δt = rand(Exponential(λ_total))
+        # Δt = rand(Exponential(λ_total))
+        Δt = randexp(rng) / λ_total
         t += Δt
 
-        u = rand() * λ_total
+        u = rand(rng) * λ_total
 
         if u < λ_inf
-            # Infection event
-
+            # Infection
             if S > 0
                 S -= 1
                 if has_latent_stage(model)
@@ -72,13 +70,12 @@ function simulate(::GillespieEngine,
                     I += 1
                 end
 
-                parent = rand(1:max(I,1))  # placeholder infector
-                push_event!(log, t, Transmission, next_host_id, parent)
-                next_host_id += 1
+                push_event!(log, t, Transmission, next_id, 0)
+                next_id += 1
             end
 
         elseif u < λ_inf + λ_act
-            # Activation event
+            # Activation
             if E > 0
                 E -= 1
                 I += 1
@@ -86,10 +83,9 @@ function simulate(::GillespieEngine,
             end
 
         else
-            # Removal event
+            # Removal
             if I > 0
                 I -= 1
-                R += 1
                 push_event!(log, t, Removal, 0, 0)
             end
         end

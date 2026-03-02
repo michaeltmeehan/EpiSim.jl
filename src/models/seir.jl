@@ -32,4 +32,9 @@ draw_tau_e(model::SEIRModel) = rand(model.dτe)
 draw_tau_i(model::SEIRModel) = rand(model.dτi)
 draw_tau_s(model::SEIRModel) = rand(model.dτs)
 
+draw_beta(rng::AbstractRNG, model::SEIRModel) = rand(rng, model.dβ)
+draw_tau_e(rng::AbstractRNG, model::SEIRModel) = rand(rng, model.dτe)
+draw_tau_i(rng::AbstractRNG, model::SEIRModel) = rand(rng, model.dτi)
+draw_tau_s(rng::AbstractRNG, model::SEIRModel) = rand(rng, model.dτs)
+
 has_latent_stage(::SEIRModel) = true

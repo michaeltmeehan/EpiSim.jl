@@ -29,7 +29,12 @@ draw_beta(model::SIRModel) = rand(model.dβ)
 draw_tau_i(model::SIRModel) = rand(model.dτi)
 draw_tau_s(model::SIRModel) = rand(model.dτs)
 
+draw_beta(rng::AbstractRNG, model::SIRModel) = rand(rng, model.dβ)
+draw_tau_i(rng::AbstractRNG, model::SIRModel) = rand(rng, model.dτi)
+draw_tau_s(rng::AbstractRNG, model::SIRModel) = rand(rng, model.dτs)
+
 has_latent_stage(::SIRModel) = false
 
 # Not used but must exist for dispatch safety
 draw_tau_e(::SIRModel) = 0.0
+draw_tau_e(rng::AbstractRNG, ::SIRModel) = 0.0

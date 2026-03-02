@@ -9,7 +9,8 @@ function simulate(::SellkeEngine,
                   model::AbstractEpidemicModel,
                   S0::Int,
                   E0::Int,
-                  I0::Int)
+                  I0::Int;
+                  rng::AbstractRNG = Random.default_rng())
 
     N = S0 + E0 + I0
 
@@ -42,7 +43,7 @@ function simulate(::SellkeEngine,
     # ---------------------------------
 
     for id in (E0 + I0 + 1):N
-        push!(resistances, (randexp(), id))
+        push!(resistances, (randexp(rng), id))
     end
 
     # ---------------------------------
@@ -53,10 +54,10 @@ function simulate(::SellkeEngine,
         push_event!(log, t, Seeding, id, 0)
 
         if has_latent_stage(model)
-            τe = draw_tau_e(model)
+            τe = draw_tau_e(rng, model)
             push!(temporal, (t + τe, Activation, id))
         else
-            activate_host!(temporal, model, id, t, β, active_ids, total_beta)
+            activate_host!(rng, temporal, model, id, t, β, active_ids, total_beta)
         end
     end
 
@@ -66,7 +67,7 @@ function simulate(::SellkeEngine,
 
     for id in (E0 + 1):(E0 + I0)
         push_event!(log, t, Seeding, id, 0)
-        total_beta = activate_host!(temporal, model, id, t, β, active_ids, total_beta)
+        total_beta = activate_host!(rng, temporal, model, id, t, β, active_ids, total_beta)
     end
 
     # ---------------------------------
@@ -79,7 +80,7 @@ function simulate(::SellkeEngine,
         t_next, ev, id = top(temporal)
 
         dΛ = total_beta / N
-        
+
         # ---------------------------------
         # Infection event?
         # ---------------------------------
@@ -96,15 +97,15 @@ function simulate(::SellkeEngine,
                 t += (r_threshold - Λ) / dΛ
                 Λ = r_threshold
 
-                parent = sample_infector(active_ids, β, total_beta)
+                parent = sample_infector(rng, active_ids, β, total_beta)
 
                 push_event!(log, t, Transmission, sid, parent)
 
                 if has_latent_stage(model)
-                    τe = draw_tau_e(model)
+                    τe = draw_tau_e(rng, model)
                     push!(temporal, (t + τe, Activation, sid))
                 else
-                    activate_host!(temporal, model, sid, t,
+                    activate_host!(rng, temporal, model, sid, t,
                                    β, active_ids, total_beta)
                 end
 
@@ -125,7 +126,7 @@ function simulate(::SellkeEngine,
 
         if ev == Activation
 
-            total_beta = activate_host!(temporal, model, id, t,
+            total_beta = activate_host!(rng, temporal, model, id, t,
                                         β, active_ids, total_beta)
 
         elseif ev == Removal || ev == SerialSampling
@@ -147,7 +148,8 @@ end
 # Host activation (adds infectious pressure + schedules events)
 # ====================================================
 
-function activate_host!(temporal,
+function activate_host!(rng::AbstractRNG,
+                        temporal,
                         model,
                         id,
                         t,
@@ -155,11 +157,11 @@ function activate_host!(temporal,
                         active_ids,
                         total_beta)
 
-    β[id] = draw_beta(model)
+    β[id] = draw_beta(rng, model)
     total_beta += β[id]
     push!(active_ids, id)
 
-    schedule_infectious_events!(temporal, model, id, t)
+    schedule_infectious_events!(rng, temporal, model, id, t)
 
     return total_beta
 end
@@ -169,24 +171,25 @@ end
 # Schedule all infectious-phase events at activation
 # ====================================================
 
-function schedule_infectious_events!(temporal,
+function schedule_infectious_events!(rng::AbstractRNG,
+                                     temporal,
                                      model,
                                      id,
                                      t_activation)
 
-    τi = draw_tau_i(model)
+    τi = draw_tau_i(rng, model)
 
     # Sampling process
-    τs = draw_tau_s(model)
+    τs = draw_tau_s(rng, model)
 
     while τs < τi
-        if rand() < model.r
+        if rand(rng) < model.r
             push!(temporal, (t_activation + τs, SerialSampling, id))
             return
         else
             push!(temporal, (t_activation + τs, FossilisedSampling, id))
         end
-        τs += draw_tau_s(model)
+        τs += draw_tau_s(rng, model)
     end
 
     # Final removal
@@ -198,9 +201,9 @@ end
 # Sample infector proportional to β
 # ====================================================
 
-function sample_infector(active_ids, β, total_beta)
+function sample_infector(rng::AbstractRNG, active_ids, β, total_beta)
 
-    u = rand() * total_beta
+    u = rand(rng) * total_beta
     s = 0.0
 
     for id in active_ids
