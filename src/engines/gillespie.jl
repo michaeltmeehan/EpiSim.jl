@@ -54,7 +54,6 @@ function simulate(::GillespieEngine,
         end
 
         # Time step
-        # Δt = rand(Exponential(λ_total))
         Δt = randexp(rng) / λ_total
         t += Δt
 

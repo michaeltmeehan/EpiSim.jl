@@ -27,6 +27,7 @@ include("core/ensemble.jl")
 include("postprocess/trajectories.jl")
 include("postprocess/summaries.jl")
 include("postprocess/ensemble_stats.jl")
+include("postprocess/linelist.jl")
 
 # Differential uniformization
 include("benchmark/du/du.jl")
@@ -48,6 +49,9 @@ export SEIRModel,
        StateTrajectory,
        du_infected_distribution,
        SIRGenerator,
-       SEIRGenerator
+       SEIRGenerator,
+       LineList,
+       secondary_cases,
+       infectious_periods
 
 end

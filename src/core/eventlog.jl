@@ -31,3 +31,32 @@ function push_event!(
     push!(log.src, src)
     return nothing
 end
+
+
+"""
+Lightweight row view of an EventLog entry.
+"""
+struct Event
+    t::Time
+    kind::EventKind
+    host::HostID
+    src::HostID
+end
+
+
+Base.length(log::EventLog) = length(log.t)
+
+function Base.iterate(log::EventLog, i=1)
+    i > length(log.t) && return nothing
+    return (
+        Event(log.t[i], log.kind[i], log.host[i], log.src[i]),
+        i + 1
+    )
+end
+
+
+Base.getindex(log::EventLog, i::Int) =
+    Event(log.t[i], log.kind[i], log.host[i], log.src[i])
+
+
+Base.size(log::EventLog) = (length(log),)
