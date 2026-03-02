@@ -30,7 +30,7 @@ include("postprocess/ensemble_stats.jl")
 
 # Differential uniformization
 include("benchmark/du/du.jl")
-using .DU: du_infected_distribution, SIRGenerator
+using .DU: du_infected_distribution, SIRGenerator, SEIRGenerator
 
 # =========================================
 # Exports
@@ -47,6 +47,7 @@ export SEIRModel,
        infected_distribution_matrix,
        StateTrajectory,
        du_infected_distribution,
-       SIRGenerator
+       SIRGenerator,
+       SEIRGenerator
 
 end

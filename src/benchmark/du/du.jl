@@ -26,10 +26,11 @@ end
 
 include("uniformization.jl")
 include("sir_generator.jl")
+include("seir_generator.jl")
 include("marginal.jl")
 include("api.jl")
 
 
-export du_infected_distribution, SIRGenerator
+export du_infected_distribution, SIRGenerator, SEIRGenerator
 
 end # module
