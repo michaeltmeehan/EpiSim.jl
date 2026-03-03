@@ -60,3 +60,10 @@ Base.getindex(log::EventLog, i::Int) =
 
 
 Base.size(log::EventLog) = (length(log),)
+
+
+Base.iterate(r::Base.Iterators.Reverse{EventLog}, i=length(r.itr)) =
+    i < 1 ? nothing :
+    (Event(r.itr.t[i], r.itr.kind[i], r.itr.host[i], r.itr.src[i]), i - 1)
+
+Base.reverse(log::EventLog) = Base.Iterators.Reverse(log)

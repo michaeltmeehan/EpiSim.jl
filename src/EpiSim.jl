@@ -39,6 +39,10 @@ using .DU: du_infected_distribution, SIRGenerator, SEIRGenerator
 include("birthdeath/likelihood.jl")
 
 
+# Trees
+include("tree/tree.jl")
+include("tree/extract.jl")
+
 # =========================================
 # Exports
 # =========================================
@@ -60,6 +64,7 @@ export SEIRModel,
        LineList,
        secondary_cases,
        infectious_periods,
-       pₙ
+       pₙ,
+       extract_sampled_tree
 
 end
