@@ -6,7 +6,7 @@ using Random
 using UnPack
 
 # Utilities
-# include("utils/random.jl")
+include("utils/random.jl")
 
 # Public API
 include("core/types.jl")

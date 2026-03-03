@@ -18,9 +18,13 @@ function simulate(::GillespieEngine,
         error("GillespieEngine requires exponential infectious period")
     end
 
-    if has_latent_stage(model) &&
-       !(model.dτe isa Exponential)
+    model_has_latent = has_latent_stage(model)
+    if model_has_latent && !(model.dτe isa Exponential)
         error("GillespieEngine requires exponential incubation period")
+    end
+
+    if !(model.dτs isa Exponential)
+        error("GillespieEngine requires exponential sampling interval")
     end
 
     N = S0 + E0 + I0
@@ -37,20 +41,27 @@ function simulate(::GillespieEngine,
         push_event!(log, t, Seeding, id, 0)
     end
 
-    β̄ = mean(model.dβ)
+    exposed_ids = collect(1:E0)
+    active_ids = collect((E0 + 1):(E0 + I0))
+
+    β_bar = mean(model.dβ)
+    σ_bar = model_has_latent ? 1 / mean(model.dτe) : 0.0
+    α_bar = 1 / mean(model.dτi)
+    ψ_bar = 1 / mean(model.dτs)
 
     state = SimulationState(t, E0 + I0, 0)
 
     # For ID assignment
-    next_id = N + 1
+    next_id = E0 + I0 + 1
 
     while E + I > 0 && !should_stop(stopping_criterion, state)
 
-        λ_inf = β̄ * S * I / N
-        λ_act = has_latent_stage(model) ? (E / mean(model.dτe)) : 0.0
-        λ_rem = I / mean(model.dτi)
+        λ_inf = β_bar * S * I / N
+        λ_act = σ_bar * E
+        λ_rem = α_bar * I
+        λ_sam = ψ_bar * I
 
-        λ_total = λ_inf + λ_act + λ_rem
+        λ_total = λ_inf + λ_act + λ_rem + λ_sam
 
         if λ_total == 0.0
             break
@@ -65,16 +76,18 @@ function simulate(::GillespieEngine,
         if u < λ_inf
             # Infection
             if S > 0
+                infector = rand(rng, active_ids)
+                push_event!(log, t, Transmission, next_id, infector)
                 S -= 1
-                if has_latent_stage(model)
+                if model_has_latent
                     E += 1
+                    push!(exposed_ids, next_id)
                 else
                     I += 1
+                    push!(active_ids, next_id)
                 end
-
-                push_event!(log, t, Transmission, next_id, 0)
-                next_id += 1
                 update_state!(state, t, Transmission)
+                next_id += 1
             end
 
         elseif u < λ_inf + λ_act
@@ -82,16 +95,33 @@ function simulate(::GillespieEngine,
             if E > 0
                 E -= 1
                 I += 1
-                push_event!(log, t, Activation, 0, 0)
+                activated_id = popr!(rng, exposed_ids)
+                push!(active_ids, activated_id)
+                push_event!(log, t, Activation, activated_id, 0)
                 update_state!(state, t, Activation)
             end
 
-        else
+        elseif u < λ_inf + λ_act + λ_rem
             # Removal
             if I > 0
                 I -= 1
-                push_event!(log, t, Removal, 0, 0)
+                removed_id = popr!(rng, active_ids)
+                push_event!(log, t, Removal, removed_id, 0)
                 update_state!(state, t, Removal)
+            end
+        else
+            # Sampling
+            if I > 0
+                if rand(rng) < model.r
+                    I -= 1
+                    sampled_id = popr!(rng, active_ids)
+                    ev = SerialSampling
+                else
+                    sampled_id = rand(rng, active_ids)
+                    ev = FossilisedSampling
+                end
+                push_event!(log, t, ev, sampled_id, 0)
+                update_state!(state, t, ev)
             end
         end
     end
