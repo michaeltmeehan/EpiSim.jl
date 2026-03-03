@@ -56,7 +56,11 @@ function simulate(::GillespieEngine,
 
     while E + I > 0 && !should_stop(stopping_criterion, state)
 
-        λ_inf = β_bar * S * I / N
+        if model isa BirthDeathModel
+            λ_inf = β_bar * I
+        else
+            λ_inf = β_bar * S * I / N
+        end
         λ_act = σ_bar * E
         λ_rem = α_bar * I
         λ_sam = ψ_bar * I

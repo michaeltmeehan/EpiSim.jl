@@ -17,6 +17,7 @@ include("core/stopping.jl")
 include("models/abstract_model.jl")
 include("models/seir.jl")
 include("models/sir.jl")
+include("models/birthdeath.jl")
 
 # Engines
 include("engines/abstract_engine.jl")
@@ -40,6 +41,7 @@ using .DU: du_infected_distribution, SIRGenerator, SEIRGenerator
 
 export SEIRModel,
        SIRModel,
+       BirthDeathModel,
        SellkeEngine,
        GillespieEngine,
        simulate,
