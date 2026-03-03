@@ -44,3 +44,6 @@ Return true if model has a latent stage (SEIR),
 false for SIR-type models.
 """
 function has_latent_stage end
+
+
+default_stopping(::AbstractEpidemicModel) = NoStopping()

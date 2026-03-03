@@ -11,6 +11,7 @@ using UnPack
 # Public API
 include("core/types.jl")
 include("core/eventlog.jl")
+include("core/stopping.jl")
 
 # Models
 include("models/abstract_model.jl")

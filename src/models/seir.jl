@@ -38,3 +38,6 @@ draw_tau_i(rng::AbstractRNG, model::SEIRModel) = rand(rng, model.dτi)
 draw_tau_s(rng::AbstractRNG, model::SEIRModel) = rand(rng, model.dτs)
 
 has_latent_stage(::SEIRModel) = true
+
+
+default_stopping(::SEIRModel) = NoStopping()

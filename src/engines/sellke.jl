@@ -10,7 +10,8 @@ function simulate(::SellkeEngine,
                   S0::Int,
                   E0::Int,
                   I0::Int;
-                  rng::AbstractRNG = Random.default_rng())
+                  rng::AbstractRNG = Random.default_rng(),
+                  stopping_criterion = default_stopping(model))
 
     N = S0 + E0 + I0
 
@@ -70,11 +71,13 @@ function simulate(::SellkeEngine,
         total_beta = activate_host!(rng, temporal, model, id, t, β, active_ids, total_beta)
     end
 
+    state = SimulationState(t, E0 + I0, 0)
+
     # ---------------------------------
     # Main loop
     # ---------------------------------
 
-    while !isempty(temporal)
+    while !isempty(temporal) && !should_stop(stopping_criterion, state)
 
         # Next temporal event
         t_next, ev, id = top(temporal)
@@ -109,6 +112,8 @@ function simulate(::SellkeEngine,
                                    β, active_ids, total_beta)
                 end
 
+                update_state!(state, t, Transmission)
+
                 continue
             end
         end
@@ -134,9 +139,10 @@ function simulate(::SellkeEngine,
             total_beta -= β[id]
             β[id] = 0.0
             remove_active!(active_ids, id)
+            update_state!(state, t, ev)
 
         elseif ev == FossilisedSampling
-            # Nothing structural changes
+            update_state!(state, t, ev)
         end
     end
 

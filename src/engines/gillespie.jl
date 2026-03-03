@@ -10,7 +10,8 @@ function simulate(::GillespieEngine,
                   S0::Int,
                   E0::Int,
                   I0::Int;
-                  rng::AbstractRNG = Random.default_rng())
+                  rng::AbstractRNG = Random.default_rng(),
+                  stopping_criterion = default_stopping(model))
 
     # Enforce exponential assumptions
     if !(model.dτi isa Exponential)
@@ -38,10 +39,12 @@ function simulate(::GillespieEngine,
 
     β̄ = mean(model.dβ)
 
+    state = SimulationState(t, E0 + I0, 0)
+
     # For ID assignment
     next_id = N + 1
 
-    while E + I > 0
+    while E + I > 0 && !should_stop(stopping_criterion, state)
 
         λ_inf = β̄ * S * I / N
         λ_act = has_latent_stage(model) ? (E / mean(model.dτe)) : 0.0
@@ -71,6 +74,7 @@ function simulate(::GillespieEngine,
 
                 push_event!(log, t, Transmission, next_id, 0)
                 next_id += 1
+                update_state!(state, t, Transmission)
             end
 
         elseif u < λ_inf + λ_act
@@ -79,6 +83,7 @@ function simulate(::GillespieEngine,
                 E -= 1
                 I += 1
                 push_event!(log, t, Activation, 0, 0)
+                update_state!(state, t, Activation)
             end
 
         else
@@ -86,6 +91,7 @@ function simulate(::GillespieEngine,
             if I > 0
                 I -= 1
                 push_event!(log, t, Removal, 0, 0)
+                update_state!(state, t, Removal)
             end
         end
     end

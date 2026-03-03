@@ -38,3 +38,6 @@ has_latent_stage(::SIRModel) = false
 # Not used but must exist for dispatch safety
 draw_tau_e(::SIRModel) = 0.0
 draw_tau_e(rng::AbstractRNG, ::SIRModel) = 0.0
+
+
+default_stopping(::SIRModel) = NoStopping()
