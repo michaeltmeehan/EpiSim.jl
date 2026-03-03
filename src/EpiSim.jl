@@ -35,6 +35,10 @@ include("postprocess/linelist.jl")
 include("benchmark/du/du.jl")
 using .DU: du_infected_distribution, SIRGenerator, SEIRGenerator
 
+# Probability
+include("birthdeath/likelihood.jl")
+
+
 # =========================================
 # Exports
 # =========================================
@@ -55,6 +59,7 @@ export SEIRModel,
        SEIRGenerator,
        LineList,
        secondary_cases,
-       infectious_periods
+       infectious_periods,
+       pₙ
 
 end

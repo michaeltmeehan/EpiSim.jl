@@ -9,10 +9,11 @@ function simulate_ensemble(engine,
                            I0::Int;
                            nrep::Int,
                            rng::AbstractRNG,
+                           stopping_criterion = default_stopping(model),
                            summary_fn = identity)
 
     # Run first simulation to determine return type
-    log1 = simulate(engine, model, S0, E0, I0; rng=rng)
+    log1 = simulate(engine, model, S0, E0, I0; rng=rng, stopping_criterion=stopping_criterion)
     result1 = summary_fn(log1)
 
     T = typeof(result1)
@@ -21,7 +22,7 @@ function simulate_ensemble(engine,
 
     # Remaining simulations
     for r in 2:nrep
-        log = simulate(engine, model, S0, E0, I0; rng=rng)
+        log = simulate(engine, model, S0, E0, I0; rng=rng, stopping_criterion=stopping_criterion)
         results[r] = summary_fn(log)
     end
 

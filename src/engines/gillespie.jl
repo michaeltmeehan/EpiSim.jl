@@ -45,9 +45,9 @@ function simulate(::GillespieEngine,
     active_ids = collect((E0 + 1):(E0 + I0))
 
     β_bar = mean(model.dβ)
-    σ_bar = model_has_latent ? 1 / mean(model.dτe) : 0.0
-    α_bar = 1 / mean(model.dτi)
-    ψ_bar = 1 / mean(model.dτs)
+    σ_bar = model_has_latent ? 1. / mean(model.dτe) : 0.0
+    α_bar = 1. / mean(model.dτi)
+    ψ_bar = 1. / mean(model.dτs)
 
     state = SimulationState(t, E0 + I0, 0)
 

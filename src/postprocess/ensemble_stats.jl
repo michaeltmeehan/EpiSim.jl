@@ -14,7 +14,9 @@ function infected_distribution_matrix(
 
         for j in 1:n_grid
             i = tr.I[j]
-            M[j, i+1] += 1.0
+            if i ≤ N
+                M[j, i+1] += 1.0
+            end
         end
     end
 
