@@ -1,46 +1,48 @@
-@inline function _bd_coefficients(w, λ, μ, ψ, r)
-    a = muladd(r * ψ, w, μ)
-    b = muladd((1 - r) * ψ, w, -(λ + μ + ψ))
-    disc = muladd(-4a, λ, b*b)
-    disc = ifelse(disc < zero(disc), zero(disc), disc)
+using DifferentialEquations
+
+@inline function E_constant(
+    t::T,
+    λ::T,
+    μ::T,
+    ψ::T;
+    ρ₀::T = zero(T)
+) where {T<:AbstractFloat}
+
+    t ≤ zero(T) && return one(T) - ρ₀
+
+    δ = λ + μ + ψ
+    disc = muladd(δ, δ, -4λ*μ)
+    disc = ifelse(disc < zero(T), zero(T), disc)
     Δ = sqrt(disc)
-    return a, b, Δ
-end
 
+    E_plus  = (δ + Δ) / (2λ)
+    E_minus = (δ - Δ) / (2λ)
 
-@inline function γ(w::T, tᵢ::T, tⱼ::T, λ::T, μ::T, ψ::T, r::T) where {T<:AbstractFloat}
+    E0 = one(T) - ρ₀
 
-    τ = tⱼ - tᵢ
-    τ ≤ zero(T) && return zero(T)
+    # C = (E0 - E_minus)/(E0 - E_plus)
+    numC = E0 - E_minus
+    denC = E0 - E_plus
 
-    a, b, Δ = _bd_coefficients(w, λ, μ, ψ, r)
+    scale = max(abs(denC), one(T))
+    denC = abs(denC) < eps(T)*scale ?
+           copysign(eps(T)*scale, denC) :
+           denC
 
-    x = Δ * τ
+    C = numC / denC
 
-    # Small Δ τ branch (series expansion)
+    x = Δ * t
+
+    # small Δ t branch
     if abs(x) ≤ sqrt(eps(T))
-
-        # Use first-order expansion of exp(-x)
-        # 1 - exp(-x) ≈ x - x^2/2
-        num = 2λ * (x - x*x/2)
-
-        den = (Δ - b) + (Δ + b) * (1 - x + x*x/2)
-
-        # stabilise denominator
-        scale = max(abs(den), one(T))
-        den = abs(den) < eps(T)*scale ?
-              copysign(eps(T)*scale, den) :
-              den
-
-        return num / den
+        # exp(-x) ≈ 1 - x + x^2/2
+        em = one(T) - x + x*x/2
+    else
+        em = exp(-x)
     end
 
-    # General branch
-    em = exp(-x)
-    one_minus_em = -expm1(-x)   # 1 - exp(-x), stable
-
-    num = 2λ * one_minus_em
-    den = (Δ - b) + (Δ + b) * em
+    num = E_minus - C * E_plus * em
+    den = one(T) - C * em
 
     scale = max(abs(den), one(T))
     den = abs(den) < eps(T)*scale ?
@@ -50,178 +52,225 @@ end
     return num / den
 end
 
+# @inline function E(t, T, λ, μ, ψ, r)
+#     γ₀ = γ(zero(λ), t, T, λ, μ, ψ, r)
+#     return one(λ) - ψ / λ * γ₀ / (one(λ) - γ₀)
+# end
 
-@inline function α(w::T, tᵢ::T, tⱼ::T, λ::T, μ::T, ψ::T, r::T) where {T<:AbstractFloat}
-    a = muladd(r * ψ, w, μ)
-    return a / λ * γ(w, tᵢ, tⱼ, λ, μ, ψ, r)
+# This is the log of Φ(t) (eq 10. MacPherson et al. 2022)
+@inline function g_constant(
+    t::T,
+    λ::T,
+    μ::T,
+    ψ::T;
+    ρ₀::T = zero(T)
+) where {T<:AbstractFloat}
+
+    t ≤ zero(T) && return zero(T)
+
+    δ = λ + μ + ψ
+
+    disc = muladd(δ, δ, -4λ*μ)
+    disc = ifelse(disc < zero(T), zero(T), disc)
+    Δ = sqrt(disc)
+
+    # Riccati roots
+    E_plus  = (δ + Δ) / (2λ)
+    E_minus = (δ - Δ) / (2λ)
+
+    E0 = one(T) - ρ₀
+
+    # C coefficient
+    numC = E0 - E_minus
+    denC = E0 - E_plus
+
+    scale = max(abs(denC), one(T))
+    denC = abs(denC) < eps(T)*scale ?
+           copysign(eps(T)*scale, denC) :
+           denC
+
+    C = numC / denC
+
+    x = Δ * t
+
+    em = abs(x) ≤ sqrt(eps(T)) ?
+         one(T) - x + x*x/2 :
+         exp(-x)
+
+    num = one(T) - C * em
+    den = one(T) - C
+
+    scale = max(abs(den), one(T))
+    den = abs(den) < eps(T)*scale ?
+          copysign(eps(T)*scale, den) :
+          den
+
+    return -x - 2 * log(num / den)
 end
 
 
-@inline function β(w::T, tᵢ::T, tⱼ::T, λ::T, μ::T, ψ::T, r::T) where {T<:AbstractFloat}
-    a, b, _ = _bd_coefficients(w, λ, μ, ψ, r)
-    γij = γ(w, tᵢ, tⱼ, λ, μ, ψ, r)
-    return one(T) + b / λ * γij + a / λ * γij * γij
+"""
+Solve the coupled backward-time ODE system for:
+
+E(t)  = extinction probability
+g(t)  = log Φ(t)
+
+Time convention:
+t = 0   present
+t > 0   into the past
+"""
+function solve_Eg(
+    λ::Function,
+    μ::Function,
+    ψ::Function;
+    ρ₀::Real = 0.0,
+    tspan::Tuple{<:Real,<:Real} = (0.0, 5.0),
+    abstol::Real = 1e-12,
+    reltol::Real = 1e-12
+)
+
+    # ODE system
+    function Eg_ode!(du, u, p, t)
+        E = u[1]
+        g = u[2]
+
+        λt = λ(t)
+        μt = μ(t)
+        ψt = ψ(t)
+
+        # dE/dt
+        du[1] =
+            λt * E^2 -
+            (λt + μt + ψt) * E +
+            μt
+
+        # dg/dt
+        du[2] =
+            2 * λt * E -
+            (λt + μt + ψt)
+    end
+
+    # Initial conditions at present
+    E0 = 1 - ρ₀
+    g0 = 0.0
+
+    u0 = [E0, g0]
+
+    prob = ODEProblem(Eg_ode!, u0, tspan, nothing)
+
+    sol = solve(
+        prob,
+        Vern9(),
+        abstol = abstol,
+        reltol = reltol
+    )
+
+    return sol
 end
 
 
-@inline function pₙ(n::S,tᵢ::T, tⱼ::T, λ::T, μ::T, ψ::T, r::T) where {S<:Integer, T<:AbstractFloat}
-    n == 0 && return α(one(T), tᵢ, tⱼ, λ, μ, ψ, r)
-    # return (one(T) - α(one(T), tᵢ, tⱼ, λ, μ, ψ, r)) * (one(T) - γ(one(T), tᵢ, tⱼ, λ, μ, ψ, r)) * γ(one(T), tᵢ, tⱼ, λ, μ, ψ, r)^(n-1)
-    return β(one(T), tᵢ, tⱼ, λ, μ, ψ, r) * γ(one(T), tᵢ, tⱼ, λ, μ, ψ, r)^(n-1)
+@inline backward_time(t, Tfinal) = Tfinal - t
+
+@inline logaddexp(a::T, b::T) where {T<:AbstractFloat} =
+    max(a,b) + log1p(exp(-abs(a-b)))
+
+
+function bd_loglikelihood_constant(tree::Tree, λ::T, μ::T, ψ::T, r::T; ρ₀::T = zero(T)) where {T<:AbstractFloat}
+
+    Tfinal = maximum(tree.time)
+
+    log_λ   = log(λ)
+    log_ψ   = log(ψ)
+    log_r   = log(r)
+    log_1mr = log1p(-r)
+
+    # survival conditioning
+    E_T = E_constant(Tfinal, λ, μ, ψ; ρ₀=ρ₀)
+    ll  = log1p(-E_T)
+
+    for node in tree
+
+        τ = Tfinal - node.time
+
+        gτ = g_constant(τ, λ, μ, ψ; ρ₀=ρ₀)
+        Eτ = E_constant(τ, λ, μ, ψ; ρ₀=ρ₀)
+
+        if node.kind === Binary
+
+            ll += log_λ + gτ
+
+        elseif node.kind === SampledLeaf
+
+            # stable log(r + (1-r)Eτ)
+            log_term = logaddexp(log_r,
+                                 log_1mr + log(Eτ))
+
+            ll += log_ψ + log_term - gτ
+
+        elseif node.kind === SampledUnary
+
+            ll += log_ψ + log_1mr
+        end
+    end
+
+    return ll
 end
 
 
-@inline function pₙ(n::Vector{S}, tᵢ::T, tⱼ::T, λ::T, μ::T, ψ::T, r::T) where {S<:Integer, T<:AbstractFloat}
-    return [pₙ(nᵢ, tᵢ, tⱼ, λ, μ, ψ, r) for nᵢ in n]
+function bd_loglikelihood_ode(
+    tree::Tree,
+    λ::Function,
+    μ::Function,
+    ψ::Function,
+    r::T;
+    ρ₀::T = zero(T),
+    abstol::Real = 1e-12,
+    reltol::Real = 1e-12
+) where {T<:AbstractFloat}
+
+    Tfinal = maximum(tree.time)
+
+    # Solve ODE once from 0 → Tfinal
+    sol = solve_Eg(
+        λ, μ, ψ;
+        ρ₀ = ρ₀,
+        tspan = (zero(T), Tfinal),
+        abstol = abstol,
+        reltol = reltol
+    )
+
+    log_r   = log(r)
+    log_1mr = log1p(-r)
+
+    # Survival conditioning
+    E_T = sol(Tfinal)[1]
+    ll  = log1p(-E_T)
+
+    for node in tree
+
+        τ = Tfinal - node.time
+
+        u = sol(τ)
+        Eτ = u[1]
+        gτ = u[2]
+
+        if node.kind === Binary
+
+            ll += log(λ(τ)) + gτ
+
+        elseif node.kind === SampledLeaf
+
+            # stable log(r + (1-r)Eτ)
+            log_term = logaddexp(log_r,
+                                 log_1mr + log(Eτ))
+
+            ll += log(ψ(τ)) + log_term - gτ
+
+        elseif node.kind === SampledUnary
+
+            ll += log(ψ(τ)) + log_1mr
+        end
+    end
+
+    return ll
 end
-
-
-@inline function pₙ(n::Vector{S}, tᵢ::T, tⱼ::Vector{T}, λ::T, μ::T, ψ::T, r::T) where {S<:Integer, T<:AbstractFloat}
-    return transpose(reduce(hcat,[pₙ(n, tᵢ, tⱼᵢ, λ, μ, ψ, r) for tⱼᵢ in tⱼ]))
-end
-
-
-
-
-# @inline function γ(w::Number, tᵢ::Number, tⱼ::Number, λ::Float64, μ::Float64, ψ::Float64, r::Float64)
-#     aw = muladd(r * ψ, w, μ)
-#     bw = muladd((one(w) - r) * ψ, w, -(λ + μ + ψ))
-
-#     disc = bw*bw - 4 * aw * λ
-#     disc = ifelse(disc < zero(disc), zero(disc), disc)
-#     Δ    = sqrt(disc)
-
-#     τ = tⱼ - tᵢ
-#     x = Δ * τ
-
-#     if abs(x) ≤ oftype(x, 1e-8)
-#         denom = oftype(τ, 2) - (Δ + bw) * τ
-#         e = eps(denom) * one(denom)
-#         denom = ifelse(abs(denom) < e, copysign(e, denom), denom)
-#         return (oftype(τ, 2) * λ * τ) / denom
-#     else
-#         num = oftype(τ, 2) * λ * (-expm1(-x))         # 1 - exp(-x)
-#         den = (Δ - bw) + (Δ + bw) * exp(-x)
-#         ed  = eps(den) * one(den)
-#         den = ifelse(abs(den) < ed, copysign(ed, den), den)
-#         return num / den
-#     end
-# end
-
-
-
-
-# @inline function γ₀(tᵢ::Number, tⱼ::Number, λ::Float64, μ::Float64, ψ::Float64)
-#     bw = -(λ + μ + ψ)
-
-#     disc = bw*bw - 4 * μ * λ
-#     disc = ifelse(disc < zero(disc), zero(disc), disc)
-#     Δ    = sqrt(disc)
-
-#     τ = tⱼ - tᵢ
-#     x = Δ * τ
-
-#     if abs(x) ≤ oftype(x, 1e-8)
-#         denom = oftype(τ, 2) - (Δ + bw) * τ
-#         e = eps(denom) * one(denom)
-#         denom = ifelse(abs(denom) < e, copysign(e, denom), denom)
-#         return (oftype(τ, 2) * λ * τ) / denom
-#     else
-#         num = oftype(τ, 2) * λ * (-expm1(-x))         # 1 - exp(-x)
-#         den = (Δ - bw) + (Δ + bw) * exp(-x)
-#         ed  = eps(den) * one(den)
-#         den = ifelse(abs(den) < ed, copysign(ed, den), den)
-#         return num / den
-#     end
-# end
-
-
-# @inline function γ₁(tᵢ::Number, tⱼ::Number, λ::Float64, μ::Float64, ψ::Float64, r::Float64)
-#     a = μ + r * ψ
-#     b = (1. - r) * ψ - (λ + μ + ψ)
-
-#     disc = b*b - 4 * a * λ
-#     disc = ifelse(disc < zero(disc), zero(disc), disc)
-#     Δ    = sqrt(disc)
-
-#     τ = tⱼ - tᵢ
-#     x = Δ * τ
-
-#     if abs(x) ≤ oftype(x, 1e-8)
-#         denom = oftype(τ, 2) - (Δ + b) * τ
-#         e = eps(denom) * one(denom)
-#         denom = ifelse(abs(denom) < e, copysign(e, denom), denom)
-#         return (oftype(τ, 2) * λ * τ) / denom
-#     else
-#         num = oftype(τ, 2) * λ * (-expm1(-x))         # 1 - exp(-x)
-#         den = (Δ - b) + (Δ + b) * exp(-x)
-#         ed  = eps(den) * one(den)
-#         den = ifelse(abs(den) < ed, copysign(ed, den), den)
-#         return num / den
-#     end
-# end
-
-
-# function p₀(tᵢ::Float64, tⱼ::Float64, λ::Float64, μ::Float64, ψ::Float64)
-#     r = λ - μ - ψ
-#     c₁ = sqrt(r^2 + 4 * λ * ψ)
-#     c₂ = -r / c₁
-#     τ = tⱼ - tᵢ
-#     return ((λ + μ + ψ) + c₁ * (exp(-c₁ * τ) * (1. - c₂) - (1. + c₂)) / (exp(-c₁ * τ) * (1 - c₂) + (1 + c₂))) / (2 * λ)
-# end
-
-
-# function β(tᵢ::Number, tⱼ::Number, λ::Float64, μ::Float64, ψ::Float64, r::Float64)
-#     a = μ + r * ψ
-#     b = (1. - r) * ψ - (λ + μ + ψ)
-#     γij = γ₁(tᵢ, tⱼ, λ, μ, ψ, r)
-#     return (λ + b * γij + a * γij * γij) / λ
-# end
-
-
-# function p₀(tᵢ::Float64, tⱼ::Float64, λ::Float64, μ::Float64, ψ::Float64)
-#     return 1. - ψ / λ * γ₀(tᵢ, tⱼ, λ, μ, ψ) / (1. - γ₀(tᵢ, tⱼ, λ, μ, ψ))
-# end
-
-
-# TODO: Add root conditioning
-# @inline function likelihood(tree::Vector{Node}, λ::Float64, μ::Float64, ψ::Float64, r::Float64)
-#     t_tip = tree[1].time
-#     logΦ(t) = log(β(t, t_tip, λ, μ, ψ, r))
-#     E(t) = p₀(t, t_tip, λ, μ, ψ)
-#     logλ = log(λ)
-#     logψ = log(ψ)
-#     log1mr = log(1 - r)
-#     logL = 0.0
-#     for node in tree
-#         if node isa Binary
-#             logL += logλ + logΦ(node.time)
-#         elseif node isa SampledLeaf
-#             logL += logψ + log((1 - r) * E(node.time) + r) - logΦ(node.time)
-#         elseif node isa SampledUnary
-#             logL += logψ + log1mr
-#         end
-#     end
-#     return logL
-# end
-
-
-# @inline function likelihood(tree::Tree, λ::Float64, μ::Float64, ψ::Float64, r::Float64)
-#     t_tip = tree.time[1]
-#     logΦ(t) = log(β(t, t_tip, λ, μ, ψ, r))
-#     E(t) = p₀(t, t_tip, λ, μ, ψ)
-#     logλ = log(λ)
-#     logψ = log(ψ)
-#     log1mr = log(1 - r)
-#     logL = 0.0
-#     for idx in eachindex(tree.time)
-#         if tree.kind[idx] == K_Binary
-#             logL += logλ + logΦ(tree.time[idx])
-#         elseif tree.kind[idx] == K_SampledLeaf
-#             logL += logψ + log((1 - r) * E(tree.time[idx]) + r) - logΦ(tree.time[idx])
-#         elseif tree.kind[idx] == K_SampledUnary
-#             logL += logψ + log1mr
-#         end
-#     end
-#     return logL
-# end
