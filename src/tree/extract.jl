@@ -106,3 +106,203 @@ function extract_sampled_tree(log::EventLog)
 
     return tree
 end
+
+
+function validate_tree_against_log(log::EventLog, tree::Tree)
+
+    ############################################
+    # Build event indices
+    ############################################
+
+    event_index = Dict{Tuple{EventKind,HostID,Time},Bool}()
+    tx_index    = Dict{Tuple{HostID,HostID,Time},Bool}()
+
+    sampling_count = 0
+
+    for ev in log
+        event_index[(ev.kind, ev.host, ev.t)] = true
+
+        if ev.kind == Transmission
+            # key = (infectee, infector, time)
+            tx_index[(ev.host, ev.src, ev.t)] = true
+        end
+
+        if ev.kind == SerialSampling || ev.kind == FossilisedSampling
+            sampling_count += 1
+        end
+    end
+
+    ############################################
+    # 4. No sampling → no tree
+    ############################################
+
+    if sampling_count == 0 && length(tree) != 0
+        error("Tree exists but no sampling events in log.")
+    end
+
+    ############################################
+    # 1. Root ↔ Seeding correspondence
+    ############################################
+
+    for (_, node) in pairs(tree)
+        if node.kind == Root
+            if !haskey(event_index, (Seeding, node.host, node.time))
+                error("Root does not correspond to Seeding event (host=$(node.host), time=$(node.time)).")
+            end
+        end
+    end
+
+    ############################################
+    # 2. Leaf ↔ Sampling correspondence
+    ############################################
+
+    for (_, node) in pairs(tree)
+        if node.kind == SampledLeaf
+            ok = haskey(event_index, (SerialSampling, node.host, node.time)) ||
+                 haskey(event_index, (FossilisedSampling, node.host, node.time))
+            if !ok
+                error("SampledLeaf does not correspond to sampling event (host=$(node.host), time=$(node.time)).")
+            end
+        end
+    end
+
+    ############################################
+    # Transmission ↔ Binary / UnsampledUnary
+    ############################################
+
+    for (i, node) in pairs(tree)
+
+        if node.kind == Binary
+
+            infectee_host = tree.host[node.right]
+            infector_host = node.host
+
+            if !haskey(tx_index, (infectee_host, infector_host, node.time))
+                error("Binary node at index $i does not match Transmission event.")
+            end
+
+        elseif node.kind == UnsampledUnary
+
+            infectee_host = tree.host[node.left]
+            infector_host = node.host
+
+            if !haskey(tx_index, (infectee_host, infector_host, node.time))
+                error("UnsampledUnary node at index $i does not match Transmission event.")
+            end
+        end
+    end
+
+    ############################################
+    # SampledUnary ↔ FossilisedSampling
+    ############################################
+
+    for (_, node) in pairs(tree)
+        if node.kind == SampledUnary
+            if !haskey(event_index, (FossilisedSampling, node.host, node.time))
+                error("SampledUnary does not correspond to FossilisedSampling event (host=$(node.host), time=$(node.time)).")
+            end
+        end
+    end
+
+    ############################################
+    # 6. Removal events must not appear
+    ############################################
+
+    for (_, node) in pairs(tree)
+        if haskey(event_index, (Removal, node.host, node.time))
+            error("Removal event appears in tree (host=$(node.host), time=$(node.time)).")
+        end
+    end
+
+    ############################################
+    # 3. Every sampled leaf traces to a root
+    ############################################
+
+    for (i, node) in pairs(tree)
+        if node.kind == SampledLeaf
+            current = i
+            while tree.parent[current] != 0
+                current = tree.parent[current]
+            end
+            if tree.kind[current] != Root
+                error("Sampled leaf at index $i does not trace to a Root.")
+            end
+        end
+    end
+
+    ############################################
+    # 8. Every root has ≥1 sampled descendant
+    ############################################
+
+    for (i, node) in pairs(tree)
+        if node.kind == Root
+
+            found_sample = false
+            stack = [i]
+
+            while !isempty(stack)
+                j = pop!(stack)
+
+                if tree.kind[j] == SampledLeaf
+                    found_sample = true
+                    break
+                end
+
+                l = tree.left[j]
+                r = tree.right[j]
+
+                l != 0 && push!(stack, l)
+                r != 0 && push!(stack, r)
+            end
+
+            if !found_sample
+                error("Root at index $i has no sampled descendant.")
+            end
+        end
+    end
+
+    ############################################
+    # 9. No extraneous nodes (every node has sampled descendant)
+    ############################################
+
+    for (i, _) in pairs(tree)
+
+        found_sample = false
+        stack = [i]
+
+        while !isempty(stack)
+            j = pop!(stack)
+
+            if tree.kind[j] == SampledLeaf
+                found_sample = true
+                break
+            end
+
+            l = tree.left[j]
+            r = tree.right[j]
+
+            l != 0 && push!(stack, l)
+            r != 0 && push!(stack, r)
+        end
+
+        if !found_sample
+            error("Node at index $i has no sampled descendant.")
+        end
+    end
+
+    ############################################
+    # No duplicate event-node mapping
+    ############################################
+
+    seen = Set{Tuple{NodeKind,HostID,Time}}()
+
+    for (_, node) in pairs(tree)
+        key = (node.kind, node.host, node.time)
+        if key in seen
+            error("Duplicate node-event mapping detected for host=$(node.host), time=$(node.time).")
+        end
+        push!(seen, key)
+    end
+
+    return true
+end
