@@ -1,32 +1,26 @@
 using DifferentialEquations
 
-@inline function E_constant(
-    t::T,
-    λ::T,
-    μ::T,
-    ψ::T;
-    ρ₀::T = zero(T)
-) where {T<:AbstractFloat}
+@inline function E_constant(t, λ, μ, ψ; ρ₀ = zero(λ))
 
-    t ≤ zero(T) && return one(T) - ρ₀
+    t ≤ zero(λ) && return one(λ) - ρ₀
 
     δ = λ + μ + ψ
     disc = muladd(δ, δ, -4λ*μ)
-    disc = ifelse(disc < zero(T), zero(T), disc)
+    disc = ifelse(disc < zero(λ), zero(λ), disc)
     Δ = sqrt(disc)
 
     E_plus  = (δ + Δ) / (2λ)
     E_minus = (δ - Δ) / (2λ)
 
-    E0 = one(T) - ρ₀
+    E0 = one(λ) - ρ₀
 
     # C = (E0 - E_minus)/(E0 - E_plus)
     numC = E0 - E_minus
     denC = E0 - E_plus
 
-    scale = max(abs(denC), one(T))
-    denC = abs(denC) < eps(T)*scale ?
-           copysign(eps(T)*scale, denC) :
+    scale = max(abs(denC), one(λ))
+    denC = abs(denC) < eps(λ)*scale ?
+           copysign(eps(λ)*scale, denC) :
            denC
 
     C = numC / denC
@@ -34,19 +28,19 @@ using DifferentialEquations
     x = Δ * t
 
     # small Δ t branch
-    if abs(x) ≤ sqrt(eps(T))
+    if abs(x) ≤ sqrt(eps(λ))
         # exp(-x) ≈ 1 - x + x^2/2
-        em = one(T) - x + x*x/2
+        em = one(λ) - x + x*x/2
     else
         em = exp(-x)
     end
 
     num = E_minus - C * E_plus * em
-    den = one(T) - C * em
+    den = one(λ) - C * em
 
-    scale = max(abs(den), one(T))
-    den = abs(den) < eps(T)*scale ?
-          copysign(eps(T)*scale, den) :
+    scale = max(abs(den), one(λ))
+    den = abs(den) < eps(λ)*scale ?
+          copysign(eps(λ)*scale, den) :
           den
 
     return num / den
@@ -58,51 +52,45 @@ end
 # end
 
 # This is the log of Φ(t) (eq 10. MacPherson et al. 2022)
-@inline function g_constant(
-    t::T,
-    λ::T,
-    μ::T,
-    ψ::T;
-    ρ₀::T = zero(T)
-) where {T<:AbstractFloat}
+@inline function g_constant(t, λ, μ, ψ; ρ₀ = zero(λ))
 
-    t ≤ zero(T) && return zero(T)
+    t ≤ zero(λ) && return zero(λ)
 
     δ = λ + μ + ψ
 
     disc = muladd(δ, δ, -4λ*μ)
-    disc = ifelse(disc < zero(T), zero(T), disc)
+    disc = ifelse(disc < zero(λ), zero(λ), disc)
     Δ = sqrt(disc)
 
     # Riccati roots
     E_plus  = (δ + Δ) / (2λ)
     E_minus = (δ - Δ) / (2λ)
 
-    E0 = one(T) - ρ₀
+    E0 = one(λ) - ρ₀
 
     # C coefficient
     numC = E0 - E_minus
     denC = E0 - E_plus
 
-    scale = max(abs(denC), one(T))
-    denC = abs(denC) < eps(T)*scale ?
-           copysign(eps(T)*scale, denC) :
+    scale = max(abs(denC), one(λ))
+    denC = abs(denC) < eps(λ)*scale ?
+           copysign(eps(λ)*scale, denC) :
            denC
 
     C = numC / denC
 
     x = Δ * t
 
-    em = abs(x) ≤ sqrt(eps(T)) ?
-         one(T) - x + x*x/2 :
+    em = abs(x) ≤ sqrt(eps(λ)) ?
+         one(λ) - x + x*x/2 :
          exp(-x)
 
-    num = one(T) - C * em
-    den = one(T) - C
+    num = one(λ) - C * em
+    den = one(λ) - C
 
-    scale = max(abs(den), one(T))
-    den = abs(den) < eps(T)*scale ?
-          copysign(eps(T)*scale, den) :
+    scale = max(abs(den), one(λ))
+    den = abs(den) < eps(λ)*scale ?
+          copysign(eps(λ)*scale, den) :
           den
 
     return -x - 2 * log(num / den)
@@ -171,11 +159,13 @@ end
 
 @inline backward_time(t, Tfinal) = Tfinal - t
 
-@inline logaddexp(a::T, b::T) where {T<:AbstractFloat} =
+@inline logaddexp(a, b) =
     max(a,b) + log1p(exp(-abs(a-b)))
 
 
-function bd_loglikelihood_constant(tree::Tree, λ::T, μ::T, ψ::T, r::T; ρ₀::T = zero(T)) where {T<:AbstractFloat}
+function bd_loglikelihood_constant(tree::Tree,
+                                   λ, μ, ψ, r;
+                                   ρ₀ = zero(λ))
 
     Tfinal = maximum(tree.time)
 
@@ -186,7 +176,8 @@ function bd_loglikelihood_constant(tree::Tree, λ::T, μ::T, ψ::T, r::T; ρ₀:
 
     # survival conditioning
     E_T = E_constant(Tfinal, λ, μ, ψ; ρ₀=ρ₀)
-    ll  = log1p(-E_T)
+    E_T = clamp(E_T, zero(E_T), one(E_T))
+    ll = log1p(-E_T)
 
     for node in tree
 
@@ -194,6 +185,7 @@ function bd_loglikelihood_constant(tree::Tree, λ::T, μ::T, ψ::T, r::T; ρ₀:
 
         gτ = g_constant(τ, λ, μ, ψ; ρ₀=ρ₀)
         Eτ = E_constant(τ, λ, μ, ψ; ρ₀=ρ₀)
+        Eτ = clamp(Eτ, zero(Eτ), one(Eτ))
 
         if node.kind === Binary
 

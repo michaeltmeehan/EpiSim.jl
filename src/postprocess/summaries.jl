@@ -1,3 +1,9 @@
+@inline function nsampled(log::EventLog)
+    count(ev -> ev == SerialSampling || ev == FossilisedSampling,
+          log.kind)
+end
+
+
 function final_size(log::EventLog)
     count(ev -> ev == Transmission || ev == Seeding,
           log.kind)

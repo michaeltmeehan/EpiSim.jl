@@ -44,6 +44,11 @@ include("tree/extract.jl")
 include("birthdeath/pgf.jl")
 include("birthdeath/likelihood.jl")
 
+# Inference
+include("birthdeath/utils.jl")
+include("birthdeath/inference/mle_constant.jl")
+include("birthdeath/inference/ensemble_fit.jl")
+
 
 # =========================================
 # Exports
@@ -54,8 +59,12 @@ export SEIRModel,
        BirthDeathModel,
        SellkeEngine,
        GillespieEngine,
+       StopWhenCumulativeInfected,
+       StopWhenTimeReached,
+       StopWhenCumulativeSampled,
        simulate,
        simulate_ensemble,
+       nsampled,
        reconstruct_trajectory,
        reconstruct_on_grid,
        infected_distribution_matrix,
@@ -69,6 +78,10 @@ export SEIRModel,
        pₙ,
        γ, α, β,
        extract_sampled_tree,
-       bd_loglikelihood_constant
+       bd_loglikelihood_constant,
+       fit_bd_constant,
+       mle_bd_constant,
+       fit_bd_ensemble_mle,
+       bd_pairs_plot
 
 end
