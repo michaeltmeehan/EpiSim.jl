@@ -1,99 +1,160 @@
 using DifferentialEquations
 
-@inline function E_constant(t, λ, μ, ψ; ρ₀ = zero(λ))
 
-    t ≤ zero(λ) && return one(λ) - ρ₀
+@inline safe_log(x) =
+    x > zero(x) ? log(x) : -1e12
+
+@inline clamp01(x) =
+    clamp(x, eps(x), one(x) - eps(x))
+
+@inline function expm1_safe(x)
+
+    abs(x) < sqrt(eps(x)) ?
+        x + x*x/2 :
+        exp(x) - 1
+
+end
+
+
+@inline function bd_coefficients(λ, μ, ψ)
 
     δ = λ + μ + ψ
+
     disc = muladd(δ, δ, -4λ*μ)
     disc = ifelse(disc < zero(λ), zero(λ), disc)
+
     Δ = sqrt(disc)
 
     E_plus  = (δ + Δ) / (2λ)
     E_minus = (δ - Δ) / (2λ)
 
+    return Δ, E_plus, E_minus
+end
+
+
+@inline function E_constant(t, λ, μ, ψ; ρ₀ = zero(λ))
+
+    t ≤ zero(λ) && return one(λ) - ρ₀
+
+    Δ, E_plus, E_minus = bd_coefficients(λ, μ, ψ)
+
     E0 = one(λ) - ρ₀
 
-    # C = (E0 - E_minus)/(E0 - E_plus)
     numC = E0 - E_minus
     denC = E0 - E_plus
 
-    scale = max(abs(denC), one(λ))
-    denC = abs(denC) < eps(λ)*scale ?
-           copysign(eps(λ)*scale, denC) :
-           denC
+    if abs(denC) < eps(λ)
+        return E_minus
+    end
 
     C = numC / denC
 
     x = Δ * t
-
-    # small Δ t branch
-    if abs(x) ≤ sqrt(eps(λ))
-        # exp(-x) ≈ 1 - x + x^2/2
-        em = one(λ) - x + x*x/2
-    else
-        em = exp(-x)
-    end
+    em = exp(-x)
 
     num = E_minus - C * E_plus * em
     den = one(λ) - C * em
 
-    scale = max(abs(den), one(λ))
-    den = abs(den) < eps(λ)*scale ?
-          copysign(eps(λ)*scale, den) :
-          den
+    if abs(den) < eps(λ)
+        return E_minus
+    end
 
-    return num / den
+    E = num / den
+
+    return clamp01(E)
 end
 
-# @inline function E(t, T, λ, μ, ψ, r)
-#     γ₀ = γ(zero(λ), t, T, λ, μ, ψ, r)
-#     return one(λ) - ψ / λ * γ₀ / (one(λ) - γ₀)
-# end
+@inline function E_constant_coeff(t, Δ, E_plus, E_minus; ρ₀)
+
+    t ≤ zero(t) && return one(t) - ρ₀
+
+    E0 = one(t) - ρ₀
+
+    numC = E0 - E_minus
+    denC = E0 - E_plus
+
+    if abs(denC) < eps(t)
+        return E_minus
+    end
+
+    C = numC / denC
+
+    x  = Δ * t
+    em = exp(-x)
+
+    num = E_minus - C * E_plus * em
+    den = one(t) - C * em
+
+    if abs(den) < eps(t)
+        return E_minus
+    end
+
+    E = num / den
+
+    return clamp01(E)
+end
 
 # This is the log of Φ(t) (eq 10. MacPherson et al. 2022)
 @inline function g_constant(t, λ, μ, ψ; ρ₀ = zero(λ))
 
     t ≤ zero(λ) && return zero(λ)
 
-    δ = λ + μ + ψ
-
-    disc = muladd(δ, δ, -4λ*μ)
-    disc = ifelse(disc < zero(λ), zero(λ), disc)
-    Δ = sqrt(disc)
-
-    # Riccati roots
-    E_plus  = (δ + Δ) / (2λ)
-    E_minus = (δ - Δ) / (2λ)
+    Δ, E_plus, E_minus = bd_coefficients(λ, μ, ψ)
 
     E0 = one(λ) - ρ₀
 
-    # C coefficient
     numC = E0 - E_minus
     denC = E0 - E_plus
 
-    scale = max(abs(denC), one(λ))
-    denC = abs(denC) < eps(λ)*scale ?
-           copysign(eps(λ)*scale, denC) :
-           denC
+    if abs(denC) < eps(λ)
+        return -Δ * t
+    end
 
     C = numC / denC
 
     x = Δ * t
-
-    em = abs(x) ≤ sqrt(eps(λ)) ?
-         one(λ) - x + x*x/2 :
-         exp(-x)
+    em = exp(-x)
 
     num = one(λ) - C * em
     den = one(λ) - C
 
-    scale = max(abs(den), one(λ))
-    den = abs(den) < eps(λ)*scale ?
-          copysign(eps(λ)*scale, den) :
-          den
+    if abs(num) < eps(λ) || abs(den) < eps(λ)
+        return -Δ * t
+    end
 
-    return -x - 2 * log(num / den)
+    log_ratio = log(num) - log(den)
+
+    return -x - 2 * log_ratio
+end
+
+@inline function g_constant_coeff(t, Δ, E_plus, E_minus; ρ₀)
+
+    t ≤ zero(t) && return zero(t)
+
+    E0 = one(t) - ρ₀
+
+    numC = E0 - E_minus
+    denC = E0 - E_plus
+
+    if abs(denC) < eps(t)
+        return -Δ * t
+    end
+
+    C = numC / denC
+
+    x  = Δ * t
+    em = exp(-x)
+
+    num = one(t) - C * em
+    den = one(t) - C
+
+    if abs(num) < eps(t) || abs(den) < eps(t)
+        return -Δ * t
+    end
+
+    log_ratio = log(num) - log(den)
+
+    return -x - 2 * log_ratio
 end
 
 
@@ -166,46 +227,51 @@ end
 function bd_loglikelihood_constant(tree::Tree,
                                    λ, μ, ψ, r;
                                    ρ₀ = zero(λ))
+    try
+        Tfinal = maximum(tree.time)
 
-    Tfinal = maximum(tree.time)
+        log_λ   = safe_log(λ)
+        log_ψ   = safe_log(ψ)
+        log_r   = safe_log(r)
+        log_1mr = log1p(-r)
 
-    log_λ   = log(λ)
-    log_ψ   = log(ψ)
-    log_r   = log(r)
-    log_1mr = log1p(-r)
+        Δ, E_plus, E_minus = bd_coefficients(λ, μ, ψ)
 
-    # survival conditioning
-    E_T = E_constant(Tfinal, λ, μ, ψ; ρ₀=ρ₀)
-    E_T = clamp(E_T, zero(E_T), one(E_T))
-    ll = log1p(-E_T)
+        # survival conditioning
+        E_T = clamp01(E_constant_coeff(Tfinal, Δ, E_plus, E_minus; ρ₀=ρ₀))
+        E_T ≥ 1 - sqrt(eps(E_T)) && return -1e12
 
-    for node in tree
+        ll = log1p(-E_T)
 
-        τ = Tfinal - node.time
+        for node in tree
 
-        gτ = g_constant(τ, λ, μ, ψ; ρ₀=ρ₀)
-        Eτ = E_constant(τ, λ, μ, ψ; ρ₀=ρ₀)
-        Eτ = clamp(Eτ, zero(Eτ), one(Eτ))
+            τ = Tfinal - node.time
 
-        if node.kind === Binary
+            gτ = g_constant_coeff(τ, Δ, E_plus, E_minus; ρ₀=ρ₀)
+            Eτ = clamp01(E_constant_coeff(τ, Δ, E_plus, E_minus; ρ₀=ρ₀))
 
-            ll += log_λ + gτ
+            if node.kind === Binary
 
-        elseif node.kind === SampledLeaf
+                ll += log_λ + gτ
 
-            # stable log(r + (1-r)Eτ)
-            log_term = logaddexp(log_r,
-                                 log_1mr + log(Eτ))
+            elseif node.kind === SampledLeaf
 
-            ll += log_ψ + log_term - gτ
+                # stable log(r + (1-r)Eτ)
+                log_term = logaddexp(log_r,
+                                     log_1mr + log(Eτ))
 
-        elseif node.kind === SampledUnary
+                ll += log_ψ + log_term - gτ
 
-            ll += log_ψ + log_1mr
+            elseif node.kind === SampledUnary
+
+                ll += log_ψ + log_1mr
+            end
         end
-    end
 
-    return ll
+        return ll
+    catch
+        return -1e12
+    end
 end
 
 

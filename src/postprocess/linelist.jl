@@ -89,18 +89,20 @@ end
 
 function secondary_cases(ll::LineList)
 
-    counts = Dict{HostID,Int}()
+    df = ll.hosts
+    N = nrow(df)
 
-    for row in eachrow(ll.hosts)
-        if !ismissing(row.infection_time)
-            counts[row.id] = 0
-            if !ismissing(row.infector) && row.infector > 0
-                counts[row.infector] = get(counts, row.infector, 0) + 1
-            end
+    counts = zeros(Int, N)
+
+    for row in eachrow(df)
+
+        if !ismissing(row.infector) && row.infector > 0
+            counts[row.infector] += 1
         end
+
     end
 
-    return collect(values(counts))
+    return counts
 end
 
 
@@ -165,4 +167,80 @@ end
 function empirical_R(ll::LineList)
     sc = secondary_cases(ll)
     return mean(sc)
+end
+
+
+function empirical_R_completed(ll::LineList)
+
+    df = ll.hosts
+    counts = secondary_cases(ll)
+
+    completed = .!ismissing.(df.removal_time)
+
+    return mean(counts[completed])
+end
+
+
+function empirical_sampling_proportion(ll::LineList)
+
+    df = ll.hosts
+
+    sampled = 0
+    removed = 0
+
+    for row in eachrow(df)
+
+        if !ismissing(row.removal_time)
+
+            removed += 1
+
+            if row.n_samples > 0
+                sampled += 1
+            end
+
+        end
+    end
+
+    return sampled / removed
+end
+
+
+function susceptible_fraction(log::EventLog, S₀::Int, E₀::Int, I₀::Int)
+
+    S = S₀
+    N = S₀ + E₀ + I₀
+
+    frac = Dict{Int,Float64}()
+
+    for ev in log
+
+        if ev.kind == Transmission || ev.kind == Seeding
+            frac[ev.host] = S/N
+            S -= 1
+        end
+
+    end
+
+    return frac
+end
+
+
+function normalized_offspring(ll::LineList, log::EventLog, S₀::Int, E₀::Int, I₀::Int)
+
+    counts = secondary_cases(ll)
+    sfrac = susceptible_fraction(log, S₀, E₀, I₀)
+
+    N = S₀ + E₀ + I₀
+
+    norm = Float64[]
+
+    for (i,c) in enumerate(counts)
+
+        if haskey(sfrac,i)
+            push!(norm, c / sfrac[i])
+        end
+
+    end
+
+    return norm
 end

@@ -18,7 +18,7 @@ I0 = 1
 ρ₀ = 0.
 r = 1.
 
-min_samples = 1_000
+min_samples = 100
 
 nrep = 10_000
 
@@ -33,7 +33,7 @@ valid_sims = filter(sim -> nsampled(sim) >= min_samples, ensemble)
 
 trees = [extract_sampled_tree(sim) for sim in valid_sims]
 
-mles = fit_bd_ensemble_mle(trees; fixed=(:ψ, ψ), r=r, ρ₀=ρ₀)
+mles = fit_bd_ensemble_mle(trees; fixed=(:μ, μ), r=r, ρ₀=ρ₀)
 
 truth = Dict(:λ => λ, :μ => μ, :ψ => ψ, :R0 => λ/(μ+r*ψ), :δ => λ - (μ + r*ψ))
 

@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "4f59819ee6b1b252c848acf25042cefaa11294dc"
+project_hash = "7ed2373b2305454e7dd1d559cc8de245e92cbc3d"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -691,7 +691,7 @@ weakdeps = ["Adapt", "ChainRulesCore"]
     EnzymeCoreChainRulesCoreExt = "ChainRulesCore"
 
 [[deps.EpiSim]]
-deps = ["ADTypes", "ArraysOfArrays", "BenchmarkTools", "ColorSchemes", "Crayons", "DataFrames", "DataFramesMeta", "DataStructures", "DifferentialEquations", "Distributions", "ForwardDiff", "JLD2", "Lazy", "LinearAlgebra", "MetaGraphsNext", "Optim", "OrdinaryDiffEq", "Parameters", "PlotlyJS", "Plots", "Printf", "Random", "RecipesBase", "RecipesPipeline", "RecursiveArrayTools", "Roots", "SparseArrays", "Statistics", "StatsBase", "StatsPlots", "Test", "UnPack"]
+deps = ["ADTypes", "ArraysOfArrays", "BenchmarkTools", "ColorSchemes", "Crayons", "DataFrames", "DataFramesMeta", "DataStructures", "DifferentialEquations", "Distributions", "ForwardDiff", "JLD2", "Lazy", "LinearAlgebra", "MetaGraphsNext", "Optim", "OrdinaryDiffEq", "Parameters", "PlotlyBase", "PlotlyJS", "Plots", "Printf", "QuadGK", "Random", "RecipesBase", "RecipesPipeline", "RecursiveArrayTools", "Roots", "SparseArrays", "Statistics", "StatsBase", "StatsPlots", "Test", "UnPack"]
 path = "."
 uuid = "baf66cd8-34c1-424a-92fd-19e59a9b7bce"
 version = "0.1.0"

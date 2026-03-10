@@ -18,6 +18,7 @@ include("models/abstract_model.jl")
 include("models/seir.jl")
 include("models/sir.jl")
 include("models/birthdeath.jl")
+include("models/reparameterize.jl")
 
 # Engines
 include("engines/abstract_engine.jl")
@@ -62,6 +63,7 @@ export SEIRModel,
        StopWhenCumulativeInfected,
        StopWhenTimeReached,
        StopWhenCumulativeSampled,
+       NoStopping,
        simulate,
        simulate_ensemble,
        nsampled,
@@ -75,6 +77,12 @@ export SEIRModel,
        LineList,
        secondary_cases,
        infectious_periods,
+       generation_intervals,
+       empirical_R,
+       empirical_R_completed,
+       empirical_sampling_proportion,
+       susceptible_fraction,
+       normalized_offspring,
        pₙ,
        γ, α, β,
        extract_sampled_tree,
@@ -82,6 +90,7 @@ export SEIRModel,
        fit_bd_constant,
        mle_bd_constant,
        fit_bd_ensemble_mle,
-       bd_pairs_plot
+       bd_pairs_plot,
+       epidemic_parameter_mapping
 
 end

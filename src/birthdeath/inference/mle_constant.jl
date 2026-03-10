@@ -102,10 +102,15 @@ function fit_bd_constant(
     obj  = BDConstantObjective(tree, spec, r, ρ₀)
 
     # Optimisation
+    lower = log.([1e-6, 1e-6])  # avoid zero rates
+    upper = log.([1e3, 1e3])    # reasonable upper
+
     result = optimize(
         obj,
+        lower,
+        upper,
         θ_init,
-        LBFGS();
+        Fminbox(LBFGS());
         autodiff = AutoForwardDiff()
     )
 
@@ -170,10 +175,15 @@ function mle_bd_constant(
     spec = BDFixedSpec(fixed[1], fixed[2])
     obj  = BDConstantObjective(tree, spec, r, ρ₀)
 
+    lower = log.([1e-6, 1e-6])  # avoid zero rates
+    upper = log.([1e3, 1e3])    # reasonable upper
+
     result = optimize(
         obj,
+        lower,
+        upper,
         θ_init,
-        LBFGS();
+        Fminbox(LBFGS());
         autodiff = AutoForwardDiff()
     )
 
