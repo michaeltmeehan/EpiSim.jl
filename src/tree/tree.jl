@@ -60,6 +60,10 @@ Base.reverse(tree::Tree) = Base.Iterators.Reverse(tree)
 Base.pairs(tree::Tree) = zip(1:length(tree), tree)
 
 
+Base.pairs(r::Base.Iterators.Reverse{Tree}) =
+    zip(length(r.itr):-1:1, r)
+    
+
 function validate_tree(tree::Tree)
 
     n = length(tree.time)

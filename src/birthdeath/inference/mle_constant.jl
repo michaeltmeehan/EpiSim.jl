@@ -3,6 +3,10 @@ using ForwardDiff
 using LinearAlgebra
 using ADTypes: AutoForwardDiff
 
+function tuple_to_vector(nt::NamedTuple)
+    collect(values(nt))
+end
+
 # ============================================================
 # 1. Fixed-Parameter Specification (Identifiability Handling)
 # ============================================================
@@ -12,10 +16,41 @@ struct BDFixedSpec{T}
     fixed_value::T
 end
 
+abstract type AbstractBDParameterization end
+
+struct RateParameterization{T} <: AbstractBDParameterization
+    spec::BDFixedSpec{T}
+end
+
+struct R0DeltaParameterization{T} <: AbstractBDParameterization
+    spec::BDFixedSpec{T}
+end
+
+backtransform(::RateParameterization, λ, μ, ψ) =
+    (λ = λ, μ = μ, ψ = ψ)
+
+function backtransform(::R0DeltaParameterization, λ, μ, ψ)
+
+    δ = μ + ψ
+    p = ψ / δ
+    R₀ = λ / δ
+
+    return (R₀ = R₀, δ = δ, p = p)
+end
+
+function parameter_transform(param, θ)
+
+    λ, μ, ψ = expand_rates(param, θ)
+
+    tuple_to_vector(backtransform(param, λ, μ, ψ))
+end
+
 function expand_rates(
-    θ::AbstractVector{T},
-    spec::BDFixedSpec
-) where {T<:Real}
+    param::RateParameterization,
+    θ::AbstractVector{T}
+    ) where {T<:Real}
+
+    spec = param.spec
 
     if spec.fixed_symbol === :λ
         λ = spec.fixed_value
@@ -39,20 +74,54 @@ function expand_rates(
     return λ, μ, ψ
 end
 
+# TODO: Expand to include r and ρ₀
+function expand_rates(
+    param::R0DeltaParameterization, 
+    θ::AbstractVector{T}
+    ) where {T<:Real}
+
+    spec = param.spec
+
+    if spec.fixed_symbol === :R0
+        R₀ = spec.fixed_value
+        δ  = exp(θ[1])
+        p  = 1/(1+exp(-θ[2]))
+
+    elseif spec.fixed_symbol === :δ
+        R₀ = exp(θ[1])
+        δ  = spec.fixed_value
+        p  = 1/(1+exp(-θ[2]))
+
+    elseif spec.fixed_symbol === :p
+        R₀ = exp(θ[1])
+        δ  = exp(θ[2])
+        p  = spec.fixed_value
+
+    else
+        error("Invalid fixed parameter")
+    end
+
+    λ = R₀ * δ
+    ψ = p * δ
+    μ = (1 - p) * δ
+
+    return λ, μ, ψ
+end
+
 
 # ============================================
 # 2. Negative Log-Likelihood (AD Compatible)
 # ============================================
 
-function bd_negloglikelihood_constant(
+function bd_negloglikelihood(
     θ::AbstractVector{T},
     tree::Tree,
-    spec::BDFixedSpec;
+    param::AbstractBDParameterization;
     r,
     ρ₀ = zero(eltype(θ))
 ) where {T}
 
-    λ, μ, ψ = expand_rates(θ, spec)
+    λ, μ, ψ = expand_rates(param, θ)
 
     ll = bd_loglikelihood_constant(tree, λ, μ, ψ, r; ρ₀=ρ₀)
 
@@ -70,16 +139,16 @@ end
 
 struct BDConstantObjective{T}
     tree::Tree
-    spec::BDFixedSpec{T}
+    param::AbstractBDParameterization
     r::T
     ρ₀::T
 end
 
 function (obj::BDConstantObjective)(θ::AbstractVector{T}) where {T<:Real}
-    return bd_negloglikelihood_constant(
+    return bd_negloglikelihood(
         θ,
         obj.tree,
-        obj.spec;
+        obj.param;
         r = obj.r,
         ρ₀ = obj.ρ₀
     )
@@ -90,20 +159,18 @@ end
 # 4. Main MLE Routine
 # ============================================
 
-function fit_bd_constant(
+function fit_bd_full(
     tree::Tree;
-    fixed::Tuple{Symbol,Float64},
+    param::AbstractBDParameterization,
     r::Float64,
     ρ₀::Float64 = 0.0,
-    θ_init = log.([0.5, 0.5])
+    θ_init = zeros(2)
 )
 
-    spec = BDFixedSpec(fixed[1], fixed[2])
-    obj  = BDConstantObjective(tree, spec, r, ρ₀)
+    obj  = BDConstantObjective(tree, param, r, ρ₀)
 
-    # Optimisation
-    lower = log.([1e-6, 1e-6])  # avoid zero rates
-    upper = log.([1e3, 1e3])    # reasonable upper
+    lower = log.([1e-6, 1e-6])
+    upper = log.([1e3, 1e3])
 
     result = optimize(
         obj,
@@ -116,78 +183,58 @@ function fit_bd_constant(
 
     θ̂ = Optim.minimizer(result)
 
-    # Gradient and Hessian at optimum
+    # derivatives in θ-space
     grad = ForwardDiff.gradient(obj, θ̂)
     H    = ForwardDiff.hessian(obj, θ̂)
 
-    # Invert observed information
-    vcov = inv(H)
+    vcov_θ = inv(H)
 
-    se_log = sqrt.(diag(vcov))
+    se_θ = sqrt.(diag(vcov_θ))
 
-    # Recover rates
-    λ̂, μ̂, ψ̂ = expand_rates(θ̂, spec)
+    # recover rates
+    λ̂, μ̂, ψ̂ = expand_rates(param, θ̂)
 
-    # Delta-method SEs on rate scale
-    if spec.fixed_symbol === :λ
-        se_rate = (
-            λ = 0.0,
-            μ = μ̂ * se_log[1],
-            ψ = ψ̂ * se_log[2]
-        )
+    rates = (λ = λ̂, μ = μ̂, ψ = ψ̂)
 
-    elseif spec.fixed_symbol === :μ
-        se_rate = (
-            λ = λ̂ * se_log[1],
-            μ = 0.0,
-            ψ = ψ̂ * se_log[2]
-        )
+    # transform parameters
+    params = backtransform(param, λ̂, μ̂, ψ̂)
 
-    else  # fixed ψ
-        se_rate = (
-            λ = λ̂ * se_log[1],
-            μ = μ̂ * se_log[2],
-            ψ = 0.0
-        )
-    end
+    # delta method for transformed parameters
+    J = ForwardDiff.jacobian(θ -> parameter_transform(param, θ), θ̂)
+
+    vcov_param = J * vcov_θ * J'
+    se_param = sqrt.(diag(vcov_param))
 
     return (
-        result   = result,
-        θ̂        = θ̂,
+        result = result,
+        θ̂ = θ̂,
         gradient = grad,
-        hessian  = H,
-        vcov     = vcov,
-        se_log   = se_log,
-        rates    = (λ = λ̂, μ = μ̂, ψ = ψ̂),
-        se_rate  = se_rate
+        hessian = H,
+        vcov_θ = vcov_θ,
+        se_θ = se_θ,
+        rates = rates,
+        parameters = params,
+        vcov_parameters = vcov_param,
+        se_parameters = se_param
     )
 end
 
 
-function mle_bd_constant(
+function fit_bd_pars(
     tree::Tree;
-    fixed::Tuple{Symbol,Float64},
+    param::AbstractBDParameterization,
     r::Float64,
     ρ₀::Float64 = 0.0,
-    θ_init = log.([1.0, 0.5])
+    θ_init = zeros(2)
 )
 
-    spec = BDFixedSpec(fixed[1], fixed[2])
-    obj  = BDConstantObjective(tree, spec, r, ρ₀)
-
-    lower = log.([1e-6, 1e-6])  # avoid zero rates
-    upper = log.([1e3, 1e3])    # reasonable upper
-
-    result = optimize(
-        obj,
-        lower,
-        upper,
-        θ_init,
-        Fminbox(LBFGS());
-        autodiff = AutoForwardDiff()
+    fit = fit_bd_full(
+        tree;
+        param = param,
+        r = r,
+        ρ₀ = ρ₀,
+        θ_init = θ_init
     )
 
-    θ̂ = Optim.minimizer(result)
-
-    return expand_rates(θ̂, spec)
+    return fit.parameters
 end

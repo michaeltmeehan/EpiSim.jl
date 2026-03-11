@@ -39,6 +39,7 @@ using .DU: du_infected_distribution, SIRGenerator, SEIRGenerator
 # Trees
 include("tree/tree.jl")
 include("tree/extract.jl")
+include("tree/tree_stats.jl")
 
 
 # Probability
@@ -87,10 +88,16 @@ export SEIRModel,
        γ, α, β,
        extract_sampled_tree,
        bd_loglikelihood_constant,
-       fit_bd_constant,
-       mle_bd_constant,
        fit_bd_ensemble_mle,
        bd_pairs_plot,
-       epidemic_parameter_mapping
+       epidemic_parameter_mapping,
+       Tree,
+       TreeStats,
+       tree_statistics,
+       R0DeltaParameterization,
+       RateParameterization,
+       BDFixedSpec,
+       fit_bd_full,
+       fit_bd_pars
 
 end
