@@ -2,6 +2,7 @@ using EpiSim
 using Random
 using Distributions
 using Tables
+using Plots
 
 rng = MersenneTwister(1234)
 
@@ -33,7 +34,7 @@ transmission_heterogeneity = 0.0:1.0:2.0
 # Simulation constraints
 ############################################################
 
-target_valid = 10
+target_valid = 100
 min_samples = 100
 stopping_criterion = StopWhenCumulativeSampled(min_samples)
 
@@ -132,7 +133,7 @@ end
 
 stats_long = stack(
     rows,
-    Not([:k, :σβ]),
+    Not([:k, :σβ, :ntips]),
     variable_name = :statistic,
     value_name = :value
 )
@@ -145,7 +146,26 @@ stats = unique(stats_long.statistic)
 nrows = length(σβ_levels)
 ncols = length(stats)
 
-plt = plot(layout = (nrows, ncols), size=(350*ncols, 250*nrows))
+############################################################
+# Pre-compute y-limits for each statistic
+############################################################
+
+ylims_dict = Dict{Any,Tuple{Float64,Float64}}()
+
+for stat in stats
+    vals = stats_long.value[stats_long.statistic .== stat]
+    ylims_dict[stat] = (minimum(vals), maximum(vals))
+end
+
+############################################################
+# Plot
+############################################################
+
+plt = plot(
+    layout = (nrows, ncols),
+    size = (450*ncols, 280*nrows),
+    margin = 6Plots.mm
+)
 
 for (i, σβ) in enumerate(σβ_levels)
     for (j, stat) in enumerate(stats)
@@ -162,12 +182,26 @@ for (i, σβ) in enumerate(σβ_levels)
             plt[idx],
             df.k,
             df.value,
-            xlabel = "k",
-            ylabel = stat,
-            legend = false
+            legend = false,
+            xticks = sort(unique(df.k)),
+            ylims = ylims_dict[stat]   # <-- synchronized y-axis
         )
 
-        title!(plt[idx], "σβ = $σβ")
+        # Column titles
+        if i == 1
+            title!(plt[idx], string(stat))
+        end
+
+        # Row labels
+        if j == 1
+            ylabel!(plt[idx], "σβ = $σβ")
+        end
+
+        # Bottom x labels
+        if i == nrows
+            xlabel!(plt[idx], "k")
+        end
+
     end
 end
 
