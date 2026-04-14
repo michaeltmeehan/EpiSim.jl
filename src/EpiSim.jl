@@ -19,7 +19,7 @@ export popr!, wsample, wsampleindex, wsampleindex_cols
 
 include("core/events.jl")
 
-export EventLog, EventKind, EK_None, EK_Seeding, EK_Transmission, EK_FossilizedSampling, EK_SerialSampling, EK_Recovery, EK_Activation
+export EventLog, EventKind, EK_None, EK_Seeding, EK_Transmission, EK_FossilizedSampling, EK_SerialSampling, EK_Recovery, EK_Activation, validate_event_log
 
 # include("core/simulation.jl")
 

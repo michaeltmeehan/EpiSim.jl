@@ -227,5 +227,8 @@ function gillespie(S₀::Real,
         λ[4] = ψ * I              # Sampling
 
     end
-    return  EventLog(times, hosts, infectors, kinds)
+    el = EventLog(times, hosts, infectors, kinds)
+    population_size = isfinite(N) && isinteger(N) ? Int(N) : nothing
+    validate_event_log(el; population_size=population_size)
+    return el
 end

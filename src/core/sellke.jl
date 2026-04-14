@@ -364,5 +364,6 @@ function sellke(S₀::Int,
 
         end
     end
+    validate_event_log(el; population_size=N)
     return el
 end
