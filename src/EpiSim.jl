@@ -58,16 +58,8 @@ export gillespie
 
 include("tree/tree.jl")
 
-export NodeKind, NK_None, NK_Root, NK_Binary, NK_SampledLeaf, NK_UnsampledLeaf, NK_SampledUnary, NK_UnsampledUnary
-export Tree
-
 include("utils/processing.jl")
 
-export extract_sampled_trees
-
-
-include("birthdeath/likelihood.jl")
-
-export likelihood, p₀, γ, γ₀, γ₁, β
+# include("birthdeath/likelihood.jl")
 
 end # module EpiSim

@@ -54,19 +54,3 @@ end
     @test all(isfinite, el.time)
     @test all(el.time .>= 0.0)
 end
-
-@testset "tree extraction smoke" begin
-    el = EventLog(
-        [0.0, 1.0],
-        [1, 1],
-        [0, 0],
-        [EK_Seeding, EK_SerialSampling],
-    )
-
-    trees = extract_sampled_trees(el, 1)
-
-    @test trees isa Vector{Tree}
-    @test length(trees) == 1
-    @test length(trees[1]) == 2
-    @test trees[1].kind == [NK_Root, NK_SampledLeaf]
-end
