@@ -297,12 +297,12 @@ function sellke(S₀::Int,
     while E + I > 0
 
         # Look up time for next infected event
-        t_next = top(infecteds).next_event_time
+        t_next = first(infecteds).next_event_time
 
         @assert t_next ≥ t "Next infected event time $t_next is earlier than current time $t"
 
         # Work out whether infection or temporal event occurs next
-        if !isempty(susceptibles) && top(susceptibles).resistance ≤ Λ + dΛ * (t_next - t) # Infection event
+        if !isempty(susceptibles) && first(susceptibles).resistance ≤ Λ + dΛ * (t_next - t) # Infection event
 
             @assert dΛ > 0.0 "Infection event triggered with zero force of infection"
 

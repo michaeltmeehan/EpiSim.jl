@@ -128,11 +128,11 @@ end
     log1mr = log(1 - r)
     logL = 0.0
     for idx in eachindex(tree.time)
-        if tree.kind[idx] == K_Binary
+        if tree.kind[idx] == NK_Binary
             logL += logλ + logΦ(tree.time[idx])
-        elseif tree.kind[idx] == K_SampledLeaf
+        elseif tree.kind[idx] == NK_SampledLeaf
             logL += logψ + log((1 - r) * E(tree.time[idx]) + r) - logΦ(tree.time[idx])
-        elseif tree.kind[idx] == K_SampledUnary
+        elseif tree.kind[idx] == NK_SampledUnary
             logL += logψ + log1mr
         end
     end
