@@ -21,7 +21,14 @@ Base.length(traj::StateCountTrajectory) = length(traj.time)
 
 
 function Base.show(io::IO, traj::StateCountTrajectory)
-    print(io, "StateCountTrajectory(", length(traj), " points)")
+    print(io, "StateCountTrajectory(", length(traj), " event-time points")
+    if isempty(traj.time)
+        print(io, ", empty")
+    else
+        print(io, ", time range ", first(traj.time), " to ", last(traj.time))
+    end
+    print(io, ")")
+    print(io, "\n  derived per-log SEIR counts at raw event times; no interpolation or common time axis")
 end
 
 

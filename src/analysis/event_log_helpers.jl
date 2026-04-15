@@ -1,7 +1,10 @@
 """
-    event_indices(el::EventLog, kind::EventKind)
+    event_indices(el::EventLog, kind)
 
 Return event-log row indices whose event kind is `kind`.
+
+`kind` may be an [`EventKind`](@ref), a user-facing symbol such as
+`:transmission`, or the corresponding string.
 """
 function event_indices(el::EventLog, kind::EventKind)
     indices = Int[]
@@ -10,12 +13,17 @@ function event_indices(el::EventLog, kind::EventKind)
     end
     return indices
 end
+event_indices(el::EventLog, kind::Symbol) = event_indices(el, event_kind(kind))
+event_indices(el::EventLog, kind::AbstractString) = event_indices(el, event_kind(kind))
 
 
 """
-    event_times(el::EventLog, kind::EventKind)
+    event_times(el::EventLog, kind)
 
 Return event times for events whose kind is `kind`, preserving log order.
+
+`kind` may be an [`EventKind`](@ref), a user-facing symbol such as
+`:transmission`, or the corresponding string.
 """
 function event_times(el::EventLog, kind::EventKind)
     times = Float64[]
@@ -24,10 +32,12 @@ function event_times(el::EventLog, kind::EventKind)
     end
     return times
 end
+event_times(el::EventLog, kind::Symbol) = event_times(el, event_kind(kind))
+event_times(el::EventLog, kind::AbstractString) = event_times(el, event_kind(kind))
 
 
 """
-    first_event_time(el::EventLog, kind::EventKind)
+    first_event_time(el::EventLog, kind)
 
 Return the first time for event kind `kind`, or `nothing` if absent.
 """
@@ -37,10 +47,12 @@ function first_event_time(el::EventLog, kind::EventKind)
     end
     return nothing
 end
+first_event_time(el::EventLog, kind::Symbol) = first_event_time(el, event_kind(kind))
+first_event_time(el::EventLog, kind::AbstractString) = first_event_time(el, event_kind(kind))
 
 
 """
-    last_event_time(el::EventLog, kind::EventKind)
+    last_event_time(el::EventLog, kind)
 
 Return the last time for event kind `kind`, or `nothing` if absent.
 """
@@ -50,14 +62,18 @@ function last_event_time(el::EventLog, kind::EventKind)
     end
     return nothing
 end
+last_event_time(el::EventLog, kind::Symbol) = last_event_time(el, event_kind(kind))
+last_event_time(el::EventLog, kind::AbstractString) = last_event_time(el, event_kind(kind))
 
 
 """
-    has_event_kind(el::EventLog, kind::EventKind)
+    has_event_kind(el::EventLog, kind)
 
 Return whether `el` contains at least one event of `kind`.
 """
 has_event_kind(el::EventLog, kind::EventKind) = first_event_time(el, kind) !== nothing
+has_event_kind(el::EventLog, kind::Symbol) = has_event_kind(el, event_kind(kind))
+has_event_kind(el::EventLog, kind::AbstractString) = has_event_kind(el, event_kind(kind))
 
 
 """
@@ -123,7 +139,14 @@ Base.length(summary::HostEventSummary) = length(summary.host_id)
 
 
 function Base.show(io::IO, summary::HostEventSummary)
-    print(io, "HostEventSummary(", length(summary), " hosts)")
+    print(io, "HostEventSummary(", length(summary), " observed hosts")
+    if isempty(summary.host_id)
+        print(io, ", empty")
+    else
+        print(io, ", host id range ", first(summary.host_id), " to ", last(summary.host_id))
+    end
+    print(io, ")")
+    print(io, "\n  derived per-log host participation counts; not an event table or ensemble aggregate")
 end
 
 

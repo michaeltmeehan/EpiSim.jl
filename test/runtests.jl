@@ -148,6 +148,64 @@ end
 
 total_variation_distance(p, q) = 0.5 * sum(abs.(p .- q))
 
+@testset "public export surface" begin
+    exported = Set(names(EpiSim))
+
+    for name in (
+        :EventLog,
+        :gillespie,
+        :sellke,
+        :event_times,
+        :event_kind,
+        :host_event_summary,
+        :event_time_state_counts,
+        :transmission_tree,
+        :transmission_edges,
+        :transmission_chain,
+        :run_ensemble,
+        :ensemble_aggregate_summary,
+    )
+        @test name in exported
+    end
+
+    @test :EK_None ∉ exported
+    @test :popr! ∉ exported
+    @test :wsample ∉ exported
+    @test :wsampleindex ∉ exported
+    @test :wsampleindex_cols ∉ exported
+
+    @test EpiSim.EK_None isa EventKind
+    @test EpiSim.wsample([:a, :b], [1.0, 0.0]) == :a
+end
+
+@testset "polish wording consistency" begin
+    root = dirname(@__DIR__)
+    read_package_file(parts...) = read(joinpath(root, parts...), String)
+
+    readme = read_package_file("README.md")
+    events_src = read_package_file("src", "core", "events.jl")
+    transmission_src = read_package_file("src", "analysis", "transmission_views.jl")
+    ensemble_src = read_package_file("src", "analysis", "ensemble.jl")
+
+    @test occursin("Simulation functions return an `EventLog`", readme)
+    @test occursin("derived views over that record", readme)
+    @test occursin("canonical event record", readme)
+    @test occursin("tree-native", readme)
+    @test !occursin("tree extraction", readme)
+    @test !occursin("complete event semantics", readme)
+
+    @test occursin("tree-native representation", events_src)
+    @test !occursin("transmission tree API", events_src)
+
+    @test occursin("earliest host with no recorded infector", transmission_src)
+    @test occursin("canonical event record", transmission_src)
+    @test !occursin("seeded ancestor", transmission_src)
+    @test !occursin("complete event semantics", transmission_src)
+
+    @test occursin("derived views", ensemble_src)
+    @test !occursin("recovery layers", ensemble_src)
+end
+
 @testset "aggregate summary helpers" begin
     ensemble = EnsembleSummary(
         3,
@@ -181,6 +239,17 @@ total_variation_distance(p, q) = 0.5 * sum(abs.(p .- q))
     @test ensemble_stats.removals == ScalarSummary(5 / 3, 1.0, 3.0)
     @test ensemble_stats.samples == ScalarSummary(5 / 3, 1.0, 2.0)
     @test ensemble_stats.total_samples == 5
+    @test occursin("over simulation replicates", sprint(show, ensemble_stats))
+    @test occursin("Per-replicate quantities", sprint(show, ensemble_stats))
+    @test occursin("Ensemble-wide totals", sprint(show, ensemble_stats))
+    @test occursin("final outbreak size", sprint(show, ensemble_stats))
+    @test occursin("sampling events across all replicates", sprint(show, ensemble_stats))
+
+    ensemble_show = sprint(show, ensemble)
+    @test occursin("EnsembleSummary(3 replicates", ensemble_show)
+    @test occursin("per-replicate stored summaries", ensemble_show)
+    @test occursin("logs not retained", ensemble_show)
+    @test occursin("final size/time and event counts per replicate", ensemble_show)
 
     trajs = [
         StateCountTrajectory([0.0, 1.0, 2.0], [5, 4, 4], [0, 1, 0], [1, 2, 1], [0, 0, 2]),
@@ -194,6 +263,15 @@ total_variation_distance(p, q) = 0.5 * sum(abs.(p .- q))
     @test trajectory_stats.peak_infectious_time == ScalarSummary(0.75, 0.5, 1.0)
     @test trajectory_stats.final_removed == ScalarSummary(1.5, 1.0, 2.0)
     @test trajectory_stats.final_time == ScalarSummary(1.25, 0.5, 2.0)
+    @test occursin("no common time axis", sprint(show, trajectory_stats))
+    @test occursin("peak time is first reached within each trajectory", sprint(show, trajectory_stats))
+    @test occursin("first time of peak infectious count", sprint(show, trajectory_stats))
+
+    traj_show = sprint(show, trajs[1])
+    @test occursin("StateCountTrajectory(3 event-time points", traj_show)
+    @test occursin("time range 0.0 to 2.0", traj_show)
+    @test occursin("derived per-log SEIR counts at raw event times", traj_show)
+    @test occursin("no interpolation or common time axis", traj_show)
 
     host_summaries = [
         HostEventSummary([1, 2], [2, 0], [1, 3], [0, 1], [1, 1]),
@@ -212,6 +290,16 @@ total_variation_distance(p, q) = 0.5 * sum(abs.(p .- q))
     @test host_stats.mean_samples_per_host == ScalarSummary(1.0, 0.0, 2.0)
     @test host_stats.mean_removals_per_host == ScalarSummary(1.25, 0.5, 2.0)
     @test host_stats.mean_activations_per_host == ScalarSummary(1.0, 1.0, 1.0)
+    @test occursin("host IDs are not matched", sprint(show, host_stats))
+    @test occursin("per-host quantities are computed within each replicate first", sprint(show, host_stats))
+    @test occursin("replicate-level values are then summarized across replicates", sprint(show, host_stats))
+    @test occursin("observed hosts per replicate", sprint(show, host_stats))
+
+    host_show = sprint(show, host_summaries[1])
+    @test occursin("HostEventSummary(2 observed hosts", host_show)
+    @test occursin("host id range 1 to 2", host_show)
+    @test occursin("derived per-log host participation counts", host_show)
+    @test occursin("not an event table or ensemble aggregate", host_show)
 
     @test ensemble_before == (
         ensemble.final_size,
@@ -230,6 +318,62 @@ total_variation_distance(p, q) = 0.5 * sum(abs.(p .- q))
     @test_throws ArgumentError ensemble_aggregate_summary(EnsembleSummary(0, Int[], Int[], Float64[], Int[], Int[], Int[], Int[], Int[], nothing))
     @test_throws ArgumentError trajectory_aggregate_summary(StateCountTrajectory[])
     @test_throws ArgumentError host_aggregate_summary(HostEventSummary[])
+end
+
+@testset "transmission tree and chain views" begin
+    el = EventLog(
+        [0.0, 0.0, 0.5, 0.8, 1.0, 1.3],
+        [1, 2, 3, 4, 3, 4],
+        [0, 0, 1, 3, 0, 0],
+        [EK_Seeding, EK_Seeding, EK_Transmission, EK_Transmission, EK_Activation, EK_Removal],
+    )
+    original = (copy(el.time), copy(el.host), copy(el.infector), copy(el.kind))
+
+    view = transmission_tree(el)
+    @test view isa TransmissionTreeView
+    @test length(view) == 2
+    @test view.infector == [1, 3]
+    @test view.infectee == [3, 4]
+    @test view.time == [0.5, 0.8]
+    @test transmission_edges(view) == [
+        (infector=1, infectee=3, time=0.5),
+        (infector=3, infectee=4, time=0.8),
+    ]
+    @test transmission_edges(el) == transmission_edges(view)
+
+    view_show = sprint(show, view)
+    @test occursin("TransmissionTreeView", view_show)
+    @test occursin("2 transmission edges", view_show)
+    @test occursin("derived from EventLog transmission rows", view_show)
+    @test occursin("not a TreeSim tree", view_show)
+
+    chain = transmission_chain(view, 4)
+    @test chain isa TransmissionChain
+    @test length(chain) == 3
+    @test chain.host_id == 4
+    @test chain.host_path == [1, 3, 4]
+    @test chain.infection_time == Union{Nothing,Float64}[nothing, 0.5, 0.8]
+    @test transmission_chain(el, 4).host_path == chain.host_path
+
+    seed_chain = transmission_chain(view, 2)
+    @test seed_chain.host_path == [2]
+    @test seed_chain.infection_time == Union{Nothing,Float64}[nothing]
+
+    chain_show = sprint(show, chain)
+    @test occursin("TransmissionChain", chain_show)
+    @test occursin("host 4", chain_show)
+    @test occursin("source 1 -> host 4", chain_show)
+    @test occursin("seed status and non-transmission events remain in the EventLog", chain_show)
+
+    empty_view = transmission_tree(EventLog([0.0], [1], [0], [EK_Seeding]))
+    @test length(empty_view) == 0
+    @test transmission_edges(empty_view) == NamedTuple{(:infector, :infectee, :time),Tuple{Int,Int,Float64}}[]
+    @test occursin("no transmission events", sprint(show, empty_view))
+
+    @test_throws ArgumentError transmission_chain(view, 0)
+    cyclic = TransmissionTreeView([2, 1], [1, 2], [0.1, 0.2])
+    @test_throws ArgumentError transmission_chain(cyclic, 1)
+    @test (el.time, el.host, el.infector, el.kind) == original
 end
 
 @testset "visualization support summaries" begin
@@ -302,18 +446,46 @@ end
 
     @test total_events(el) == 8
     @test event_count(el, EK_Seeding) == 2
+    @test event_count(el, :seeding) == 2
+    @test event_count(el, :seedings) == 2
+    @test event_count(el, :serial_sampling) == 1
+    @test event_count(el, "serial_sampling") == 1
     @test event_count(el, EK_Activation) == 2
     @test event_indices(el, EK_Activation) == [5, 8]
+    @test event_indices(el, :activation) == [5, 8]
     @test event_times(el, EK_Activation) == [1.0, 1.5]
-    @test event_indices(el, EK_None) == Int[]
-    @test event_times(el, EK_None) == Float64[]
+    @test event_times(el, :activation) == [1.0, 1.5]
+    @test event_times(el, "activation") == [1.0, 1.5]
+    @test event_indices(el, EpiSim.EK_None) == Int[]
+    @test event_times(el, EpiSim.EK_None) == Float64[]
 
     @test first_event_time(el, EK_Activation) == 1.0
+    @test first_event_time(el, :activation) == 1.0
     @test last_event_time(el, EK_Activation) == 1.5
-    @test first_event_time(el, EK_None) === nothing
-    @test last_event_time(el, EK_None) === nothing
+    @test last_event_time(el, :activation) == 1.5
+    @test first_event_time(el, EpiSim.EK_None) === nothing
+    @test last_event_time(el, EpiSim.EK_None) === nothing
     @test has_event_kind(el, EK_SerialSampling)
-    @test !has_event_kind(el, EK_None)
+    @test has_event_kind(el, :serial_sampling)
+    @test !has_event_kind(el, EpiSim.EK_None)
+    @test event_kind(:transmission) == EK_Transmission
+    @test event_kind(:transmissions) == EK_Transmission
+    @test event_kind(:fossilized_sampling) == EK_FossilizedSampling
+    @test event_kind(:fossilised_sampling) == EK_FossilizedSampling
+    @test event_kind(" fossilised_sampling ") == EK_FossilizedSampling
+    @test event_kind(EK_Removal) == EK_Removal
+    @test_throws ArgumentError event_kind(:seed)
+    @test_throws ArgumentError event_kind(:none)
+    @test_throws ArgumentError event_times(el, :secondary_case)
+    invalid_message = try
+        event_kind(:secondary_case)
+    catch err
+        sprint(showerror, err)
+    end
+    @test occursin("unknown event kind :secondary_case", invalid_message)
+    @test occursin(":transmission", invalid_message)
+    @test occursin(":fossilised_sampling", invalid_message)
+    @test occursin("plural forms are also accepted", invalid_message)
 
     @test observed_hosts(el) == [1, 2, 3]
     @test observed_hosts(EventLog([0.5], [3], [9], [EK_Transmission]); include_sources=false) == [3]
@@ -481,6 +653,9 @@ end
     @test all(>(0.0), summary.final_time)
     @test mean_final_size(summary) == 1.0
     @test attack_rate(summary, 6) == 1 / 6
+    summary_show = sprint(show, summary)
+    @test occursin("EnsembleSummary(4 replicates", summary_show)
+    @test occursin("logs not retained", summary_show)
 
     retained = run_ensemble(
         rng -> gillespie(rng, 5, 0, 1, 0.0, 1.0, 1.0, 0.0, 0.0),
@@ -503,6 +678,7 @@ end
     )
     @test retained.final_time == again.final_time
     @test retained.logs[1].time == again.logs[1].time
+    @test occursin("logs retained", sprint(show, retained))
 
     Random.seed!(4401)
     expected_global_draw = rand()
@@ -531,6 +707,11 @@ end
     @test el.host == [1, 2, 3]
     @test el.infector == zeros(Int, 3)
     @test el.kind == fill(EK_Seeding, 3)
+    eventlog_show = sprint(show, el)
+    @test occursin("EventLog(3 events", eventlog_show)
+    @test occursin("time range 0.0 to 0.0", eventlog_show)
+    @test occursin("canonical simulation event record", eventlog_show)
+    @test occursin("time, host, infector, kind", eventlog_show)
 
     EpiSim.update_event_log!(el, 1.5, 4, 2, EK_Transmission)
 
@@ -540,6 +721,7 @@ end
     @test el.host[end] == 4
     @test el.infector[end] == 2
     @test el.kind[end] == EK_Transmission
+    @test occursin("time range 0.0 to 1.5", sprint(show, el))
 end
 
 @testset "EventLog semantic validation" begin
@@ -560,7 +742,7 @@ end
                                        [EK_Seeding, EK_Activation]); throw=false)
     @test !validate_event_log(EventLog([0.0, 1.0], [1, 1], [0, 2],
                                        [EK_Seeding, EK_Transmission]); throw=false)
-    @test !validate_event_log(EventLog([0.0], [1], [0], [EK_None]); throw=false)
+    @test !validate_event_log(EventLog([0.0], [1], [0], [EpiSim.EK_None]); throw=false)
     @test_throws ErrorException validate_event_log(EventLog([Inf], [1], [0], [EK_Seeding]))
 end
 

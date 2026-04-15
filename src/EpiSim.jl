@@ -7,12 +7,10 @@ using UnPack
 
 include("utils/random.jl")
 
-export popr!, wsample, wsampleindex, wsampleindex_cols
-
 # Core event-log and simulation API.
 include("core/events.jl")
 
-export EventLog, EventKind, EK_None, EK_Seeding, EK_Transmission, EK_FossilizedSampling, EK_SerialSampling, EK_Removal, EK_Activation, validate_event_log
+export EventLog, EventKind, EK_Seeding, EK_Transmission, EK_FossilizedSampling, EK_SerialSampling, EK_Removal, EK_Activation, event_kind, validate_event_log
 
 include("core/sellke.jl")
 
@@ -34,6 +32,10 @@ export StateCountTrajectory, event_time_state_counts
 include("analysis/event_log_helpers.jl")
 
 export event_indices, event_times, first_event_time, last_event_time, has_event_kind, total_events, observed_hosts, distinct_host_count, HostEventSummary, host_event_summary
+
+include("analysis/transmission_views.jl")
+
+export TransmissionTreeView, TransmissionChain, transmission_tree, transmission_edges, transmission_chain
 
 include("analysis/ensemble_derived.jl")
 

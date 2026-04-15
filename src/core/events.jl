@@ -33,6 +33,61 @@ const EVENTKIND_LABELS = Dict(
     EK_SerialSampling    => "SerialSampling"
 )
 
+const EVENTKIND_CANONICAL_NAMES = (
+    :seeding,
+    :transmission,
+    :activation,
+    :removal,
+    :fossilized_sampling,
+    :fossilised_sampling,
+    :serial_sampling,
+)
+
+const EVENTKIND_ALIASES = Dict(
+    :seeding => EK_Seeding,
+    :seedings => EK_Seeding,
+    :transmission => EK_Transmission,
+    :transmissions => EK_Transmission,
+    :activation => EK_Activation,
+    :activations => EK_Activation,
+    :removal => EK_Removal,
+    :removals => EK_Removal,
+    :fossilized_sampling => EK_FossilizedSampling,
+    :fossilized_samplings => EK_FossilizedSampling,
+    :fossilised_sampling => EK_FossilizedSampling,
+    :fossilised_samplings => EK_FossilizedSampling,
+    :serial_sampling => EK_SerialSampling,
+    :serial_samplings => EK_SerialSampling,
+)
+
+
+"""
+    event_kind(kind)
+
+Return the [`EventKind`](@ref) for a user-facing event-kind name.
+
+Existing enum values are returned unchanged. Symbols and strings such as
+`:transmission`, `:activation`, `:removal`, `:fossilized_sampling`,
+`:fossilised_sampling`, and `:serial_sampling` are accepted for public
+event-log helper APIs. Plural forms are accepted consistently for the same
+canonical names.
+"""
+event_kind(kind::EventKind) = kind
+
+
+event_kind(kind::Symbol) = _event_kind_from_name(String(kind), ":$kind")
+event_kind(kind::AbstractString) = _event_kind_from_name(kind, repr(kind))
+
+
+function _event_kind_from_name(kind::AbstractString, original)
+    normalized = Symbol(lowercase(strip(kind)))
+    return get(EVENTKIND_ALIASES, normalized) do
+        throw(ArgumentError("unknown event kind $original; accepted names are " *
+                            join((":" * String(name) for name in EVENTKIND_CANONICAL_NAMES), ", ") *
+                            " (plural forms are also accepted)"))
+    end
+end
+
 
 function Base.show(io::IO, x::EventKind)
     print(io, EVENTKIND_LABELS[x])
@@ -55,7 +110,7 @@ The four vectors must have equal length and are interpreted row-wise:
 Downstream consumers may assume validated logs use stable host identifiers within
 one log, never use `0` as a host id, and use `infector == 0` as the no-source
 sentinel. Logs do not encode complete model parameters, initial exposed versus
-infectious status, unobserved non-events, or a transmission tree API.
+infectious status, unobserved non-events, or a tree-native representation.
 """
 struct EventLog
     time::Vector{Float64}
@@ -66,6 +121,18 @@ end
 
 
 Base.length(el::EventLog) = length(el.time)
+
+
+function Base.show(io::IO, el::EventLog)
+    print(io, "EventLog(", length(el), " events")
+    if isempty(el.time)
+        print(io, ", empty")
+    else
+        print(io, ", time range ", el.time[1], " to ", el.time[end])
+    end
+    print(io, ")")
+    print(io, "\n  canonical simulation event record: time, host, infector, kind")
+end
 
 
 function EventLog(n::Int)

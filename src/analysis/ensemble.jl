@@ -7,11 +7,17 @@ final_size(el::EventLog) = count(==(EK_Seeding), el.kind) + count(==(EK_Transmis
 
 
 """
-    event_count(el::EventLog, kind::EventKind)
+    event_count(el::EventLog, kind)
 
 Count events of a single kind in an event log.
+
+`kind` may be an [`EventKind`](@ref), a user-facing symbol such as
+`:transmission`, `:activation`, `:removal`, `:fossilized_sampling`, or
+`:serial_sampling`, or the corresponding string.
 """
 event_count(el::EventLog, kind::EventKind) = count(==(kind), el.kind)
+event_count(el::EventLog, kind::Symbol) = event_count(el, event_kind(kind))
+event_count(el::EventLog, kind::AbstractString) = event_count(el, event_kind(kind))
 
 
 """
@@ -29,8 +35,8 @@ Compact per-replicate summary returned by [`run_ensemble`](@ref).
 
 The summary keeps primitive vectors for common outbreak-level statistics and
 stores raw logs only when requested. This keeps the default representation
-small enough for large ensembles while still allowing downstream recovery
-layers to retain full event logs when needed.
+small enough for large ensembles while still allowing derived views to use full
+event logs when needed.
 """
 struct EnsembleSummary
     nrep::Int
@@ -51,7 +57,10 @@ Base.length(summary::EnsembleSummary) = summary.nrep
 
 function Base.show(io::IO, summary::EnsembleSummary)
     retained = summary.logs === nothing ? "not retained" : "retained"
-    print(io, "EnsembleSummary(", summary.nrep, " replicates, logs ", retained, ")")
+    print(io, "EnsembleSummary(", summary.nrep, " replicates")
+    print(io, ", per-replicate stored summaries")
+    print(io, ", logs ", retained, ")")
+    print(io, "\n  fields store final size/time and event counts per replicate")
 end
 
 
@@ -123,8 +132,8 @@ an [`EventLog`](@ref), and return a compact [`EnsembleSummary`](@ref).
 
 Each replicate receives a fresh child RNG seeded from `rng`. The ensemble layer
 never reseeds Julia's global RNG. Set `retain_logs=true` to keep raw event logs
-for later derived state recovery or host-level analysis; by default only compact
-per-replicate statistics are retained.
+for later per-log derived views such as trajectories or host summaries; by
+default only compact per-replicate statistics are retained.
 """
 function run_ensemble(simulator, nrep::Integer; rng::AbstractRNG=Random.default_rng(), retain_logs::Bool=false, validate::Bool=true)
     n = Int(nrep)

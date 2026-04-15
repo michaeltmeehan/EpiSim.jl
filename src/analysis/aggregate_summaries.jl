@@ -15,11 +15,21 @@ function Base.show(io::IO, summary::ScalarSummary)
 end
 
 
+function _show_scalar_line(io::IO, label::AbstractString, summary::ScalarSummary)
+    print(io, "  ", label, ": mean=", summary.mean, ", min=", summary.minimum, ", max=", summary.maximum)
+end
+
+
 """
     EnsembleAggregateSummary
 
-Lightweight aggregate summaries over per-replicate vectors in an
+Interpreted aggregate summaries over per-replicate vectors in an
 [`EnsembleSummary`](@ref).
+
+Fields whose type is [`ScalarSummary`](@ref) summarize one value per replicate
+using mean, minimum, and maximum. `total_samples` is different: it is the
+ensemble-wide total number of fossilized plus serial sampling events across all
+replicates.
 """
 struct EnsembleAggregateSummary
     final_size::ScalarSummary
@@ -32,11 +42,35 @@ struct EnsembleAggregateSummary
 end
 
 
+function Base.show(io::IO, summary::EnsembleAggregateSummary)
+    print(io, "EnsembleAggregateSummary over simulation replicates")
+    print(io, "\n  per-replicate summaries report mean/min/max across replicates")
+    print(io, "\n\nPer-replicate quantities:")
+    print(io, "\n")
+    _show_scalar_line(io, "final outbreak size", summary.final_size)
+    print(io, "\n")
+    _show_scalar_line(io, "final event time", summary.final_time)
+    print(io, "\n")
+    _show_scalar_line(io, "transmission events per replicate", summary.transmissions)
+    print(io, "\n")
+    _show_scalar_line(io, "activation events per replicate", summary.activations)
+    print(io, "\n")
+    _show_scalar_line(io, "removal events per replicate", summary.removals)
+    print(io, "\n")
+    _show_scalar_line(io, "sampling events per replicate", summary.samples)
+    print(io, "\n\nEnsemble-wide totals:")
+    print(io, "\n  sampling events across all replicates: ", summary.total_samples)
+end
+
+
 """
     TrajectoryAggregateSummary
 
-Lightweight aggregate summaries over scalar values derived independently from
+Interpreted aggregate summaries over scalar values derived independently from
 each [`StateCountTrajectory`](@ref). No common time axis is constructed.
+
+`peak_infectious_time` is the first time at which the peak infectious count is
+reached within each trajectory, then summarized across trajectories.
 """
 struct TrajectoryAggregateSummary
     peak_infectious::ScalarSummary
@@ -46,11 +80,30 @@ struct TrajectoryAggregateSummary
 end
 
 
+function Base.show(io::IO, summary::TrajectoryAggregateSummary)
+    print(io, "TrajectoryAggregateSummary over recovered event-time trajectories")
+    print(io, "\n  each trajectory is summarized independently; no common time axis is constructed")
+    print(io, "\n  peak time is first reached within each trajectory, then summarized across trajectories")
+    print(io, "\n")
+    _show_scalar_line(io, "peak infectious count", summary.peak_infectious)
+    print(io, "\n")
+    _show_scalar_line(io, "first time of peak infectious count", summary.peak_infectious_time)
+    print(io, "\n")
+    _show_scalar_line(io, "final removed count", summary.final_removed)
+    print(io, "\n")
+    _show_scalar_line(io, "final trajectory time", summary.final_time)
+end
+
+
 """
     HostAggregateSummary
 
-Lightweight aggregate summaries over per-replicate [`HostEventSummary`](@ref)
-objects. Host IDs are not matched or merged across replicates.
+Interpreted aggregate summaries over per-replicate [`HostEventSummary`](@ref)
+objects.
+
+Per-host quantities are computed within each replicate first, then the resulting
+replicate-level values are summarized across replicates. Host IDs are not
+matched, merged, or pooled across the ensemble.
 """
 struct HostAggregateSummary
     observed_hosts::ScalarSummary
@@ -59,6 +112,26 @@ struct HostAggregateSummary
     mean_samples_per_host::ScalarSummary
     mean_removals_per_host::ScalarSummary
     mean_activations_per_host::ScalarSummary
+end
+
+
+function Base.show(io::IO, summary::HostAggregateSummary)
+    print(io, "HostAggregateSummary over per-replicate host participation summaries")
+    print(io, "\n  per-host quantities are computed within each replicate first")
+    print(io, "\n  replicate-level values are then summarized across replicates")
+    print(io, "\n  host IDs are not matched, merged, or pooled across the ensemble")
+    print(io, "\n")
+    _show_scalar_line(io, "observed hosts per replicate", summary.observed_hosts)
+    print(io, "\n")
+    _show_scalar_line(io, "mean transmissions caused per observed host", summary.mean_transmissions_per_host)
+    print(io, "\n")
+    _show_scalar_line(io, "maximum transmissions caused by one host", summary.max_transmissions_per_host)
+    print(io, "\n")
+    _show_scalar_line(io, "mean samples per observed host", summary.mean_samples_per_host)
+    print(io, "\n")
+    _show_scalar_line(io, "mean removals per observed host", summary.mean_removals_per_host)
+    print(io, "\n")
+    _show_scalar_line(io, "mean activations per observed host", summary.mean_activations_per_host)
 end
 
 
