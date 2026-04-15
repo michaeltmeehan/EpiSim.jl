@@ -51,16 +51,74 @@ struct EnsembleSummary
     logs::Union{Nothing,Vector{EventLog}}
 end
 
+"""
+    EnsembleReplicateSummary
+
+One replicate row from an [`EnsembleSummary`](@ref).
+"""
+struct EnsembleReplicateSummary
+    replicate::Int
+    final_size::Int
+    total_events::Int
+    final_time::Float64
+    transmissions::Int
+    activations::Int
+    removals::Int
+    fossilized_samples::Int
+    serial_samples::Int
+    log::Union{Nothing,EventLog}
+end
+
 
 Base.length(summary::EnsembleSummary) = summary.nrep
+Base.isempty(summary::EnsembleSummary) = length(summary) == 0
+Base.firstindex(::EnsembleSummary) = 1
+Base.lastindex(summary::EnsembleSummary) = length(summary)
+Base.eltype(::Type{EnsembleSummary}) = EnsembleReplicateSummary
+
+
+function Base.getindex(summary::EnsembleSummary, i::Integer)
+    return EnsembleReplicateSummary(
+        Int(i),
+        summary.final_size[i],
+        summary.total_events[i],
+        summary.final_time[i],
+        summary.transmissions[i],
+        summary.activations[i],
+        summary.removals[i],
+        summary.fossilized_samples[i],
+        summary.serial_samples[i],
+        summary.logs === nothing ? nothing : summary.logs[i],
+    )
+end
+
+
+function Base.iterate(summary::EnsembleSummary, state::Int=firstindex(summary))
+    state > lastindex(summary) && return nothing
+    return (summary[state], state + 1)
+end
 
 
 function Base.show(io::IO, summary::EnsembleSummary)
     retained = summary.logs === nothing ? "not retained" : "retained"
     print(io, "EnsembleSummary(", summary.nrep, " replicates")
-    print(io, ", per-replicate stored summaries")
     print(io, ", logs ", retained, ")")
-    print(io, "\n  fields store final size/time and event counts per replicate")
+end
+
+
+function Base.show(io::IO, row::EnsembleReplicateSummary)
+    retained = row.log === nothing ? "log not retained" : "log retained"
+    print(io, "EnsembleReplicateSummary(rep=", row.replicate,
+          ", final_size=", row.final_size,
+          ", total_events=", row.total_events,
+          ", final_time=", row.final_time,
+          ", transmissions=", row.transmissions,
+          ", activations=", row.activations,
+          ", removals=", row.removals,
+          ", fossilized_samples=", row.fossilized_samples,
+          ", serial_samples=", row.serial_samples,
+          ", ", retained,
+          ")")
 end
 
 

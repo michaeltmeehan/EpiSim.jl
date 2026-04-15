@@ -119,19 +119,55 @@ struct EventLog
     kind::Vector{EventKind}
 end
 
+"""
+    EventRecord
+
+One row from an [`EventLog`](@ref), returned by indexing or iterating the log.
+"""
+struct EventRecord
+    time::Float64
+    host::Int
+    infector::Int
+    kind::EventKind
+end
+
 
 Base.length(el::EventLog) = length(el.time)
+Base.isempty(el::EventLog) = isempty(el.time)
+Base.firstindex(::EventLog) = 1
+Base.lastindex(el::EventLog) = length(el)
+Base.eltype(::Type{EventLog}) = EventRecord
+
+
+function Base.getindex(el::EventLog, i::Integer)
+    return EventRecord(el.time[i], el.host[i], el.infector[i], el.kind[i])
+end
+
+
+function Base.iterate(el::EventLog, state::Int=firstindex(el))
+    state > lastindex(el) && return nothing
+    return (el[state], state + 1)
+end
 
 
 function Base.show(io::IO, el::EventLog)
     print(io, "EventLog(", length(el), " events")
-    if isempty(el.time)
+    if isempty(el)
         print(io, ", empty")
     else
         print(io, ", time range ", el.time[1], " to ", el.time[end])
     end
     print(io, ")")
-    print(io, "\n  canonical simulation event record: time, host, infector, kind")
+end
+
+
+function Base.show(io::IO, record::EventRecord)
+    print(io, "EventRecord(time=", record.time,
+          ", host=", record.host,
+          ", infector=", record.infector,
+          ", kind=")
+    show(io, record.kind)
+    print(io, ")")
 end
 
 

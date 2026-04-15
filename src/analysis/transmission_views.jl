@@ -14,21 +14,52 @@ struct TransmissionTreeView
     time::Vector{Float64}
 end
 
+"""
+    TransmissionEdge
+
+One transmission edge row from a [`TransmissionTreeView`](@ref).
+"""
+struct TransmissionEdge
+    infector::Int
+    infectee::Int
+    time::Float64
+end
+
 
 Base.length(view::TransmissionTreeView) = length(view.time)
+Base.isempty(view::TransmissionTreeView) = isempty(view.time)
+Base.firstindex(::TransmissionTreeView) = 1
+Base.lastindex(view::TransmissionTreeView) = length(view)
+Base.eltype(::Type{TransmissionTreeView}) = TransmissionEdge
+
+
+function Base.getindex(view::TransmissionTreeView, i::Integer)
+    return TransmissionEdge(view.infector[i], view.infectee[i], view.time[i])
+end
+
+
+function Base.iterate(view::TransmissionTreeView, state::Int=firstindex(view))
+    state > lastindex(view) && return nothing
+    return (view[state], state + 1)
+end
 
 
 function Base.show(io::IO, view::TransmissionTreeView)
     host_count = length(union(view.infector, view.infectee))
-    print(io, "TransmissionTreeView(", length(view), " transmission edges")
-    print(io, ", ", host_count, " hosts with transmission links")
-    if isempty(view.time)
+    print(io, "TransmissionTreeView(", length(view), " edges")
+    print(io, ", ", host_count, " linked hosts")
+    if isempty(view)
         print(io, ", no transmission events")
     else
         print(io, ", time range ", view.time[1], " to ", view.time[end])
     end
     print(io, ")")
-    print(io, "\n  derived from EventLog transmission rows; not a TreeSim tree")
+end
+
+
+function Base.show(io::IO, edge::TransmissionEdge)
+    print(io, "TransmissionEdge(", edge.infector, " -> ", edge.infectee,
+          " at time ", edge.time, ")")
 end
 
 
@@ -50,8 +81,33 @@ struct TransmissionChain
     infection_time::Vector{Union{Nothing,Float64}}
 end
 
+"""
+    TransmissionChainStep
+
+One host path step from a [`TransmissionChain`](@ref).
+"""
+struct TransmissionChainStep
+    host_id::Int
+    infection_time::Union{Nothing,Float64}
+end
+
 
 Base.length(chain::TransmissionChain) = length(chain.host_path)
+Base.isempty(chain::TransmissionChain) = isempty(chain.host_path)
+Base.firstindex(::TransmissionChain) = 1
+Base.lastindex(chain::TransmissionChain) = length(chain)
+Base.eltype(::Type{TransmissionChain}) = TransmissionChainStep
+
+
+function Base.getindex(chain::TransmissionChain, i::Integer)
+    return TransmissionChainStep(chain.host_path[i], chain.infection_time[i])
+end
+
+
+function Base.iterate(chain::TransmissionChain, state::Int=firstindex(chain))
+    state > lastindex(chain) && return nothing
+    return (chain[state], state + 1)
+end
 
 
 function Base.show(io::IO, chain::TransmissionChain)
@@ -65,7 +121,13 @@ function Base.show(io::IO, chain::TransmissionChain)
         print(io, ", source ", first(chain.host_path), " -> host ", last(chain.host_path))
     end
     print(io, ")")
-    print(io, "\n  derived from transmission edges; seed status and non-transmission events remain in the EventLog")
+end
+
+
+function Base.show(io::IO, step::TransmissionChainStep)
+    print(io, "TransmissionChainStep(host_id=", step.host_id,
+          ", infection_time=", step.infection_time,
+          ")")
 end
 
 

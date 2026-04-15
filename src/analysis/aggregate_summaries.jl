@@ -43,9 +43,7 @@ end
 
 
 function Base.show(io::IO, summary::EnsembleAggregateSummary)
-    print(io, "EnsembleAggregateSummary over simulation replicates")
-    print(io, "\n  per-replicate summaries report mean/min/max across replicates")
-    print(io, "\n\nPer-replicate quantities:")
+    print(io, "EnsembleAggregateSummary(")
     print(io, "\n")
     _show_scalar_line(io, "final outbreak size", summary.final_size)
     print(io, "\n")
@@ -58,8 +56,8 @@ function Base.show(io::IO, summary::EnsembleAggregateSummary)
     _show_scalar_line(io, "removal events per replicate", summary.removals)
     print(io, "\n")
     _show_scalar_line(io, "sampling events per replicate", summary.samples)
-    print(io, "\n\nEnsemble-wide totals:")
-    print(io, "\n  sampling events across all replicates: ", summary.total_samples)
+    print(io, "\n  total samples: ", summary.total_samples)
+    print(io, "\n)")
 end
 
 
@@ -81,9 +79,7 @@ end
 
 
 function Base.show(io::IO, summary::TrajectoryAggregateSummary)
-    print(io, "TrajectoryAggregateSummary over recovered event-time trajectories")
-    print(io, "\n  each trajectory is summarized independently; no common time axis is constructed")
-    print(io, "\n  peak time is first reached within each trajectory, then summarized across trajectories")
+    print(io, "TrajectoryAggregateSummary(")
     print(io, "\n")
     _show_scalar_line(io, "peak infectious count", summary.peak_infectious)
     print(io, "\n")
@@ -92,6 +88,7 @@ function Base.show(io::IO, summary::TrajectoryAggregateSummary)
     _show_scalar_line(io, "final removed count", summary.final_removed)
     print(io, "\n")
     _show_scalar_line(io, "final trajectory time", summary.final_time)
+    print(io, "\n)")
 end
 
 
@@ -116,10 +113,7 @@ end
 
 
 function Base.show(io::IO, summary::HostAggregateSummary)
-    print(io, "HostAggregateSummary over per-replicate host participation summaries")
-    print(io, "\n  per-host quantities are computed within each replicate first")
-    print(io, "\n  replicate-level values are then summarized across replicates")
-    print(io, "\n  host IDs are not matched, merged, or pooled across the ensemble")
+    print(io, "HostAggregateSummary(")
     print(io, "\n")
     _show_scalar_line(io, "observed hosts per replicate", summary.observed_hosts)
     print(io, "\n")
@@ -132,6 +126,7 @@ function Base.show(io::IO, summary::HostAggregateSummary)
     _show_scalar_line(io, "mean removals per observed host", summary.mean_removals_per_host)
     print(io, "\n")
     _show_scalar_line(io, "mean activations per observed host", summary.mean_activations_per_host)
+    print(io, "\n)")
 end
 
 

@@ -134,19 +134,62 @@ struct HostEventSummary
     activations::Vector{Int}
 end
 
+"""
+    HostEventRecord
+
+One row from a [`HostEventSummary`](@ref), indexed by sorted summary position.
+"""
+struct HostEventRecord
+    host_id::Int
+    transmissions_caused::Int
+    samples::Int
+    removals::Int
+    activations::Int
+end
+
 
 Base.length(summary::HostEventSummary) = length(summary.host_id)
+Base.isempty(summary::HostEventSummary) = isempty(summary.host_id)
+Base.firstindex(::HostEventSummary) = 1
+Base.lastindex(summary::HostEventSummary) = length(summary)
+Base.eltype(::Type{HostEventSummary}) = HostEventRecord
+
+
+function Base.getindex(summary::HostEventSummary, i::Integer)
+    return HostEventRecord(
+        summary.host_id[i],
+        summary.transmissions_caused[i],
+        summary.samples[i],
+        summary.removals[i],
+        summary.activations[i],
+    )
+end
+
+
+function Base.iterate(summary::HostEventSummary, state::Int=firstindex(summary))
+    state > lastindex(summary) && return nothing
+    return (summary[state], state + 1)
+end
 
 
 function Base.show(io::IO, summary::HostEventSummary)
     print(io, "HostEventSummary(", length(summary), " observed hosts")
-    if isempty(summary.host_id)
+    if isempty(summary)
         print(io, ", empty")
     else
         print(io, ", host id range ", first(summary.host_id), " to ", last(summary.host_id))
     end
     print(io, ")")
-    print(io, "\n  derived per-log host participation counts; not an event table or ensemble aggregate")
+end
+
+
+function Base.show(io::IO, record::HostEventRecord)
+    print(io, "HostEventRecord(host_id=", record.host_id,
+          ", transmissions_caused=", record.transmissions_caused,
+          ", samples=", record.samples,
+          ", removals=", record.removals,
+          ", activations=", record.activations,
+          ")")
 end
 
 

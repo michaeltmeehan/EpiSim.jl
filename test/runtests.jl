@@ -206,6 +206,128 @@ end
     @test !occursin("recovery layers", ensemble_src)
 end
 
+@testset "public collection ergonomics" begin
+    log = EventLog(
+        [0.0, 0.4, 0.4, 1.2],
+        [1, 2, 2, 1],
+        [0, 1, 0, 0],
+        [EK_Seeding, EK_Transmission, EK_Activation, EK_Removal],
+    )
+
+    @test length(log) == 4
+    @test !isempty(log)
+    @test firstindex(log) == 1
+    @test lastindex(log) == 4
+    @test eltype(EventLog) === EventRecord
+    @test log[1] == EventRecord(0.0, 1, 0, EK_Seeding)
+    @test log[end] == EventRecord(1.2, 1, 0, EK_Removal)
+    @test first(log) == log[1]
+    @test last(log) == log[end]
+    @test collect(log) == [
+        EventRecord(0.0, 1, 0, EK_Seeding),
+        EventRecord(0.4, 2, 1, EK_Transmission),
+        EventRecord(0.4, 2, 0, EK_Activation),
+        EventRecord(1.2, 1, 0, EK_Removal),
+    ]
+    @test_throws BoundsError log[0]
+    @test occursin("EventRecord(time=0.4, host=2, infector=1, kind=Transmission)", sprint(show, log[2]))
+
+    empty_log = EventLog(Float64[], Int[], Int[], EventKind[])
+    @test isempty(empty_log)
+    @test collect(empty_log) == EventRecord[]
+
+    traj = StateCountTrajectory(
+        [0.0, 0.4, 0.4, 1.2],
+        [9, 8, 8, 8],
+        [0, 1, 0, 0],
+        [1, 1, 2, 1],
+        [0, 0, 0, 1],
+    )
+    @test length(traj) == 4
+    @test firstindex(traj) == 1
+    @test lastindex(traj) == 4
+    @test eltype(StateCountTrajectory) === StateCountPoint
+    @test traj[2] == StateCountPoint(0.4, 8, 1, 1, 0)
+    @test traj[3].time == 0.4
+    @test first(traj) == StateCountPoint(0.0, 9, 0, 1, 0)
+    @test last(traj) == StateCountPoint(1.2, 8, 0, 1, 1)
+    @test collect(traj)[2:3] == [
+        StateCountPoint(0.4, 8, 1, 1, 0),
+        StateCountPoint(0.4, 8, 0, 2, 0),
+    ]
+    @test occursin("StateCountPoint(time=0.4, S=8, E=1, I=1, R=0)", sprint(show, traj[2]))
+
+    host_summary = HostEventSummary([2, 5], [1, 3], [0, 2], [1, 0], [1, 1])
+    @test length(host_summary) == 2
+    @test eltype(HostEventSummary) === HostEventRecord
+    @test host_summary[1] == HostEventRecord(2, 1, 0, 1, 1)
+    @test host_summary[2] == HostEventRecord(5, 3, 2, 0, 1)
+    @test host_summary[1].host_id == 2
+    @test host_summary[2].host_id == 5
+    @test collect(host_summary) == [host_summary[1], host_summary[2]]
+    @test_throws BoundsError host_summary[5]
+    @test occursin("HostEventRecord(host_id=5, transmissions_caused=3, samples=2, removals=0, activations=1)", sprint(show, host_summary[2]))
+
+    view = transmission_tree(log)
+    @test length(view) == 1
+    @test !isempty(view)
+    @test eltype(TransmissionTreeView) === TransmissionEdge
+    @test view[1] == TransmissionEdge(1, 2, 0.4)
+    @test first(view) == view[1]
+    @test last(view) == view[1]
+    @test collect(view) == [TransmissionEdge(1, 2, 0.4)]
+    @test transmission_edges(view) == [(infector=1, infectee=2, time=0.4)]
+    @test occursin("TransmissionEdge(1 -> 2 at time 0.4)", sprint(show, view[1]))
+
+    empty_view = TransmissionTreeView(Int[], Int[], Float64[])
+    @test isempty(empty_view)
+    @test collect(empty_view) == TransmissionEdge[]
+
+    chain = transmission_chain(view, 2)
+    @test length(chain) == 2
+    @test eltype(TransmissionChain) === TransmissionChainStep
+    @test chain[1] == TransmissionChainStep(1, nothing)
+    @test chain[end] == TransmissionChainStep(2, 0.4)
+    @test collect(chain) == [TransmissionChainStep(1, nothing), TransmissionChainStep(2, 0.4)]
+    @test occursin("TransmissionChainStep(host_id=2, infection_time=0.4)", sprint(show, chain[end]))
+
+    ensemble = EnsembleSummary(
+        2,
+        [1, 2],
+        [1, 4],
+        [0.0, 1.2],
+        [0, 1],
+        [0, 1],
+        [1, 1],
+        [0, 0],
+        [0, 0],
+        nothing,
+    )
+    @test length(ensemble) == 2
+    @test eltype(EnsembleSummary) === EnsembleReplicateSummary
+    @test ensemble[1] == EnsembleReplicateSummary(1, 1, 1, 0.0, 0, 0, 1, 0, 0, nothing)
+    @test ensemble[end].log === nothing
+    @test first(ensemble) == ensemble[1]
+    @test last(ensemble) == ensemble[2]
+    @test collect(ensemble) == [ensemble[1], ensemble[2]]
+    @test occursin("log not retained", sprint(show, ensemble[1]))
+
+    retained = EnsembleSummary(
+        1,
+        [2],
+        [4],
+        [1.2],
+        [1],
+        [1],
+        [1],
+        [0],
+        [0],
+        [log],
+    )
+    @test retained[1].log === log
+    @test occursin("log retained", sprint(show, retained[1]))
+end
+
 @testset "aggregate summary helpers" begin
     ensemble = EnsembleSummary(
         3,
@@ -239,17 +361,15 @@ end
     @test ensemble_stats.removals == ScalarSummary(5 / 3, 1.0, 3.0)
     @test ensemble_stats.samples == ScalarSummary(5 / 3, 1.0, 2.0)
     @test ensemble_stats.total_samples == 5
-    @test occursin("over simulation replicates", sprint(show, ensemble_stats))
-    @test occursin("Per-replicate quantities", sprint(show, ensemble_stats))
-    @test occursin("Ensemble-wide totals", sprint(show, ensemble_stats))
+    @test occursin("EnsembleAggregateSummary", sprint(show, ensemble_stats))
     @test occursin("final outbreak size", sprint(show, ensemble_stats))
-    @test occursin("sampling events across all replicates", sprint(show, ensemble_stats))
+    @test occursin("total samples: 5", sprint(show, ensemble_stats))
+    @test !occursin("Per-replicate quantities", sprint(show, ensemble_stats))
+    @test !occursin("Ensemble-wide totals", sprint(show, ensemble_stats))
 
     ensemble_show = sprint(show, ensemble)
     @test occursin("EnsembleSummary(3 replicates", ensemble_show)
-    @test occursin("per-replicate stored summaries", ensemble_show)
     @test occursin("logs not retained", ensemble_show)
-    @test occursin("final size/time and event counts per replicate", ensemble_show)
 
     trajs = [
         StateCountTrajectory([0.0, 1.0, 2.0], [5, 4, 4], [0, 1, 0], [1, 2, 1], [0, 0, 2]),
@@ -263,15 +383,13 @@ end
     @test trajectory_stats.peak_infectious_time == ScalarSummary(0.75, 0.5, 1.0)
     @test trajectory_stats.final_removed == ScalarSummary(1.5, 1.0, 2.0)
     @test trajectory_stats.final_time == ScalarSummary(1.25, 0.5, 2.0)
-    @test occursin("no common time axis", sprint(show, trajectory_stats))
-    @test occursin("peak time is first reached within each trajectory", sprint(show, trajectory_stats))
+    @test occursin("TrajectoryAggregateSummary", sprint(show, trajectory_stats))
     @test occursin("first time of peak infectious count", sprint(show, trajectory_stats))
+    @test !occursin("no common time axis", sprint(show, trajectory_stats))
 
     traj_show = sprint(show, trajs[1])
-    @test occursin("StateCountTrajectory(3 event-time points", traj_show)
+    @test occursin("StateCountTrajectory(3 points", traj_show)
     @test occursin("time range 0.0 to 2.0", traj_show)
-    @test occursin("derived per-log SEIR counts at raw event times", traj_show)
-    @test occursin("no interpolation or common time axis", traj_show)
 
     host_summaries = [
         HostEventSummary([1, 2], [2, 0], [1, 3], [0, 1], [1, 1]),
@@ -290,16 +408,13 @@ end
     @test host_stats.mean_samples_per_host == ScalarSummary(1.0, 0.0, 2.0)
     @test host_stats.mean_removals_per_host == ScalarSummary(1.25, 0.5, 2.0)
     @test host_stats.mean_activations_per_host == ScalarSummary(1.0, 1.0, 1.0)
-    @test occursin("host IDs are not matched", sprint(show, host_stats))
-    @test occursin("per-host quantities are computed within each replicate first", sprint(show, host_stats))
-    @test occursin("replicate-level values are then summarized across replicates", sprint(show, host_stats))
+    @test occursin("HostAggregateSummary", sprint(show, host_stats))
     @test occursin("observed hosts per replicate", sprint(show, host_stats))
+    @test !occursin("host IDs are not matched", sprint(show, host_stats))
 
     host_show = sprint(show, host_summaries[1])
     @test occursin("HostEventSummary(2 observed hosts", host_show)
     @test occursin("host id range 1 to 2", host_show)
-    @test occursin("derived per-log host participation counts", host_show)
-    @test occursin("not an event table or ensemble aggregate", host_show)
 
     @test ensemble_before == (
         ensemble.final_size,
@@ -343,9 +458,8 @@ end
 
     view_show = sprint(show, view)
     @test occursin("TransmissionTreeView", view_show)
-    @test occursin("2 transmission edges", view_show)
-    @test occursin("derived from EventLog transmission rows", view_show)
-    @test occursin("not a TreeSim tree", view_show)
+    @test occursin("2 edges", view_show)
+    @test !occursin("not a TreeSim tree", view_show)
 
     chain = transmission_chain(view, 4)
     @test chain isa TransmissionChain
@@ -363,7 +477,6 @@ end
     @test occursin("TransmissionChain", chain_show)
     @test occursin("host 4", chain_show)
     @test occursin("source 1 -> host 4", chain_show)
-    @test occursin("seed status and non-transmission events remain in the EventLog", chain_show)
 
     empty_view = transmission_tree(EventLog([0.0], [1], [0], [EK_Seeding]))
     @test length(empty_view) == 0
@@ -710,8 +823,7 @@ end
     eventlog_show = sprint(show, el)
     @test occursin("EventLog(3 events", eventlog_show)
     @test occursin("time range 0.0 to 0.0", eventlog_show)
-    @test occursin("canonical simulation event record", eventlog_show)
-    @test occursin("time, host, infector, kind", eventlog_show)
+    @test !occursin("canonical simulation event record", eventlog_show)
 
     EpiSim.update_event_log!(el, 1.5, 4, 2, EK_Transmission)
 

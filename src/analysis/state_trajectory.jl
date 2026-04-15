@@ -16,19 +16,56 @@ struct StateCountTrajectory
     R::Vector{Int}
 end
 
+"""
+    StateCountPoint
+
+One event-time SEIR count point from a [`StateCountTrajectory`](@ref).
+"""
+struct StateCountPoint
+    time::Float64
+    S::Int
+    E::Int
+    I::Int
+    R::Int
+end
+
 
 Base.length(traj::StateCountTrajectory) = length(traj.time)
+Base.isempty(traj::StateCountTrajectory) = isempty(traj.time)
+Base.firstindex(::StateCountTrajectory) = 1
+Base.lastindex(traj::StateCountTrajectory) = length(traj)
+Base.eltype(::Type{StateCountTrajectory}) = StateCountPoint
+
+
+function Base.getindex(traj::StateCountTrajectory, i::Integer)
+    return StateCountPoint(traj.time[i], traj.S[i], traj.E[i], traj.I[i], traj.R[i])
+end
+
+
+function Base.iterate(traj::StateCountTrajectory, state::Int=firstindex(traj))
+    state > lastindex(traj) && return nothing
+    return (traj[state], state + 1)
+end
 
 
 function Base.show(io::IO, traj::StateCountTrajectory)
-    print(io, "StateCountTrajectory(", length(traj), " event-time points")
-    if isempty(traj.time)
+    print(io, "StateCountTrajectory(", length(traj), " points")
+    if isempty(traj)
         print(io, ", empty")
     else
         print(io, ", time range ", first(traj.time), " to ", last(traj.time))
     end
     print(io, ")")
-    print(io, "\n  derived per-log SEIR counts at raw event times; no interpolation or common time axis")
+end
+
+
+function Base.show(io::IO, point::StateCountPoint)
+    print(io, "StateCountPoint(time=", point.time,
+          ", S=", point.S,
+          ", E=", point.E,
+          ", I=", point.I,
+          ", R=", point.R,
+          ")")
 end
 
 
