@@ -7,7 +7,7 @@ Kind of event recorded in an [`EventLog`](@ref).
 - `EK_Seeding`: host is present in the initial exposed/infected set at time zero.
 - `EK_Transmission`: host was newly infected/exposed by `infector`.
 - `EK_Activation`: host moved from exposed to infectious.
-- `EK_Recovery`: host left the infectious state without being sampled.
+- `EK_Removal`: host left the infectious state without being sampled.
 - `EK_FossilizedSampling`: host was sampled but remains infectious.
 - `EK_SerialSampling`: host was sampled and removed from the infectious state.
 - `EK_None`: internal sentinel; it is not expected in a completed event log.
@@ -16,7 +16,7 @@ Kind of event recorded in an [`EventLog`](@ref).
     EK_None = 0
     EK_Seeding = 1
     EK_Transmission = 2
-    EK_Recovery = 3
+    EK_Removal = 3
     EK_Activation = 4
     EK_FossilizedSampling = 5
     EK_SerialSampling = 6
@@ -27,7 +27,7 @@ const EVENTKIND_LABELS = Dict(
     EK_None              => "None",
     EK_Seeding           => "Seeding",
     EK_Transmission      => "Transmission",
-    EK_Recovery          => "Recovery",
+    EK_Removal           => "Removal",
     EK_Activation        => "Activation",
     EK_FossilizedSampling => "FossilizedSampling",
     EK_SerialSampling    => "SerialSampling"

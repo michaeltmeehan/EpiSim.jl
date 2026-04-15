@@ -12,7 +12,7 @@ end
 # State kinds:
 # SK_Susceptible: in susceptibles heap, resistance[i] < ∞, β[i] = 0
 # SK_Exposed: in infecteds heap, β[i] = 0, next_event = EK_Activation
-# SK_Infected: in infecteds heap, β[i] > 0, next_event ∈ {EK_FossilizedSampling, EK_SerialSampling, EK_Recovery}
+# SK_Infected: in infecteds heap, β[i] > 0, next_event ∈ {EK_FossilizedSampling, EK_SerialSampling, EK_Removal}
 # SK_Removed: never in any heap, β[i] = 0, next_event = EK_None
 
 
@@ -59,9 +59,9 @@ mutable struct Population
 end
 
 
-function Population(N::Int)
+function Population(rng::AbstractRNG, N::Int)
     return Population(fill(SK_Susceptible, N),
-                      randexp(N),
+                      randexp(rng, N),
                       zeros(Float64, N),
                       zeros(Float64, N),
                       zeros(Float64, N),
@@ -71,6 +71,8 @@ function Population(N::Int)
                       fill(Inf, N)
                       )
 end
+
+Population(N::Int) = Population(Random.default_rng(), N)
 
 
 mutable struct ActiveList
@@ -121,6 +123,7 @@ end
 
 
 function expose_host!(pop::Population,
+                      rng::AbstractRNG,
                       id::Int,
                       t::Float64,
                       td::TraitDists)
@@ -130,13 +133,14 @@ function expose_host!(pop::Population,
 
     t_infection[id] = t
     kind[id] = SK_Exposed
-    τₑ[id] = rand(td.dτₑ)
+    τₑ[id] = rand(rng, td.dτₑ)
     next_event[id] = EK_Activation
     next_event_time[id] = t + τₑ[id]
 end
 
 
-function schedule_sampling(τₑ::Float64,
+function schedule_sampling(rng::AbstractRNG,
+                           τₑ::Float64,
                            τᵢ::Float64,
                            τₛ::Float64,
                            t_infection::Float64,
@@ -144,7 +148,7 @@ function schedule_sampling(τₑ::Float64,
     t_activation = t_infection + τₑ
     if τₛ < τᵢ
         # Sampling within infectious period
-        if rand() < r
+        if rand(rng) < r
             next_event = EK_SerialSampling
         else
             next_event = EK_FossilizedSampling
@@ -152,7 +156,7 @@ function schedule_sampling(τₑ::Float64,
         next_event_time = t_activation + τₛ
     else
         # Sampling after infectious period
-        next_event = EK_Recovery
+        next_event = EK_Removal
         next_event_time = t_activation + τᵢ
     end
     return next_event, next_event_time
@@ -160,6 +164,7 @@ end
 
 
 function activate_host!(pop::Population,
+                        rng::AbstractRNG,
                         id::Int,
                         td::TraitDists,
                         r::Float64,
@@ -169,10 +174,10 @@ function activate_host!(pop::Population,
             t_infection, next_event, next_event_time = pop
 
     kind[id] = SK_Infected
-    β[id] = rand(td.dβ)
-    τᵢ[id] = rand(td.dτᵢ)
-    τₛ[id] = rand(td.dτₛ)
-    next_event[id], next_event_time[id] = schedule_sampling(τₑ[id], τᵢ[id], τₛ[id], t_infection[id], r)
+    β[id] = rand(rng, td.dβ)
+    τᵢ[id] = rand(rng, td.dτᵢ)
+    τₛ[id] = rand(rng, td.dτₛ)
+    next_event[id], next_event_time[id] = schedule_sampling(rng, τₑ[id], τᵢ[id], τₛ[id], t_infection[id], r)
 
     add_active!(active, id, β[id])
     return
@@ -180,6 +185,7 @@ end
 
 
 function fossilize_host!(pop::Population,
+                        rng::AbstractRNG,
                         id::Int,
                         td::TraitDists,
                         r::Float64)
@@ -188,9 +194,9 @@ function fossilize_host!(pop::Population,
             t_infection, next_event, next_event_time = pop
 
     # Draw a new sampling interval (gap) and update time since activation
-    Δτₛ = rand(td.dτₛ)
+    Δτₛ = rand(rng, td.dτₛ)
     τₛ[id] += Δτₛ  # now: time since activation for next sample
-    next_event[id], next_event_time[id] = schedule_sampling(τₑ[id], τᵢ[id], τₛ[id], t_infection[id], r)
+    next_event[id], next_event_time[id] = schedule_sampling(rng, τₑ[id], τᵢ[id], τₛ[id], t_infection[id], r)
 end
 
 
@@ -227,9 +233,9 @@ end
 Base.isless(a::InfKey, b::InfKey) = a.next_event_time < b.next_event_time
 
 
-function sample_infector(actives::ActiveList)
+function sample_infector(rng::AbstractRNG, actives::ActiveList)
     @assert actives.total_β > 0.0 "sample_infector called with total_β = 0"
-    u = rand() * actives.total_β
+    u = rand(rng) * actives.total_β
     cumulative = 0.0
     @inbounds for idx in eachindex(actives.β)
         cumulative += actives.β[idx]
@@ -243,7 +249,8 @@ end
 
 # TODO: Add likelihood calculation
 # TODO: Implement in-place allocations of population
-function sellke(S₀::Int, 
+function sellke(rng::AbstractRNG,
+                S₀::Int,
                 E₀::Int,
                 I₀::Int, 
                 β::Union{Float64, Distribution},    # Transmission rate
@@ -253,7 +260,7 @@ function sellke(S₀::Int,
                 r::Float64                           # Probability of removal upon sampling
                 )
 
-    # Initialize number of exposed, infected, susceptible and recovered
+    # Initialize number of exposed, infected, susceptible and removed
     S, E, I, R = S₀, E₀, I₀, 0
     
     # Total population size
@@ -266,14 +273,14 @@ function sellke(S₀::Int,
     td = TraitDists(β, τₑ, τᵢ, τₛ)
 
     # Initialize population
-    pop = Population(N)
+    pop = Population(rng, N)
 
     # Assign resistances to susceptibles
     susceptibles = BinaryMinHeap{SusKey}([SusKey(pop.resistance[id], id) for id in (E₀ + I₀ + 1):N])
 
     # Initialize exposed individuals
     for id in 1:E₀
-        expose_host!(pop, id, t, td)
+        expose_host!(pop, rng, id, t, td)
     end
 
     # Initialize list of active infectors
@@ -282,7 +289,7 @@ function sellke(S₀::Int,
     # Initialize infected individuals
     for id in (E₀ + 1):(E₀ + I₀)
         pop.t_infection[id] = t
-        activate_host!(pop, id, td, r, actives)
+        activate_host!(pop, rng, id, td, r, actives)
     end
 
     # Initialize infected event heap
@@ -319,14 +326,14 @@ function sellke(S₀::Int,
             Λ = resistance
 
             # Create new exposed individual
-            expose_host!(pop, id, t, td)
+            expose_host!(pop, rng, id, t, td)
 
             # Add new infected to heap
             push!(infecteds, InfKey(pop.next_event_time[id], id))
 
-            update_event_log!(el, t, id, sample_infector(actives), EK_Transmission)
+            update_event_log!(el, t, id, sample_infector(rng, actives), EK_Transmission)
 
-        else    # Temporal event (activation, recovery, sampling)
+        else    # Temporal event (activation, removal, sampling)
             # Withdraw infected from heap
             @unpack next_event_time, id = pop!(infecteds)
 
@@ -344,19 +351,19 @@ function sellke(S₀::Int,
                 E -= 1; I += 1
 
                 # Activate host
-                activate_host!(pop, id, td, r, actives)
+                activate_host!(pop, rng, id, td, r, actives)
 
                 # Increment slope
                 dΛ = actives.total_β / N
 
-            elseif scheduled_event == EK_SerialSampling || scheduled_event == EK_Recovery   # Sampling with removal or recovery event
-                # Update number of infected and recovered
+            elseif scheduled_event == EK_SerialSampling || scheduled_event == EK_Removal   # Serial sampling or removal event
+                # Update number of infected and removed
                 I -= 1; R += 1
                 deactivate_host!(pop, id, actives)
                 dΛ = actives.total_β / N
             elseif scheduled_event == EK_FossilizedSampling
                 # No change in counts, no change in slope
-                fossilize_host!(pop, id, td, r)
+                fossilize_host!(pop, rng, id, td, r)
             end
 
             # If events remain for this infected, push back onto heap
@@ -367,3 +374,14 @@ function sellke(S₀::Int,
     validate_event_log(el; population_size=N)
     return el
 end
+
+
+sellke(S₀::Int,
+       E₀::Int,
+       I₀::Int,
+       β::Union{Float64, Distribution},
+       τₑ::Union{Float64, Distribution},
+       τᵢ::Union{Float64, Distribution},
+       τₛ::Union{Float64, Distribution},
+       r::Float64) =
+    sellke(Random.default_rng(), S₀, E₀, I₀, β, τₑ, τᵢ, τₛ, r)

@@ -1,4 +1,5 @@
-function gillespie(S₀::Real,
+function gillespie(rng::AbstractRNG,
+                   S₀::Real,
                    E₀::Int,
                    I₀::Int,
                    β::Float64,
@@ -35,12 +36,12 @@ function gillespie(S₀::Real,
     end
 
     # Initialize rates
-    λ = Vector{Float64}(undef, 4)    # Transmission, Activation, Recovery, Sampling
+    λ = Vector{Float64}(undef, 4)    # Transmission, Activation, Removal, Sampling
 
     # Initial rates
     λ[1] = isfinite(S) ? β * S * I / N : β * I      # Transmission
     λ[2] = iszero(E) ? 0.0 : α * E              # Activation
-    λ[3] = γ * I              # Recovery
+    λ[3] = γ * I              # Removal
     λ[4] = ψ * I              # Sampling
 
     while sum(λ) > 0.
@@ -49,10 +50,10 @@ function gillespie(S₀::Real,
         λ_total = sum(λ)
 
         # Time to next event
-        t += randexp() / λ_total
+        t += randexp(rng) / λ_total
 
         # Determine which event occurs
-        r_event = rand() * λ_total
+        r_event = rand(rng) * λ_total
         cumulative_rate = 0.0
         event_type = 0
 
@@ -72,32 +73,32 @@ function gillespie(S₀::Real,
             new_exposed = E + I + R
             kind = EK_Transmission
             host = new_exposed
-            infector = rand(infectives)
+            infector = rand(rng, infectives)
             push!(exposeds, new_exposed)  # Add new exposed to population
 
         elseif event_type == 2  # Activation
             E -= 1; I += 1
-            new_infected = popr!(exposeds)
+            new_infected = popr!(rng, exposeds)
             kind = EK_Activation
             host = new_infected
             push!(infectives, new_infected)  # Add new infected to population
 
-        elseif event_type == 3  # Recovery
+        elseif event_type == 3  # Removal
             I -= 1; R += 1
-            new_recovered = popr!(infectives)
-            kind = EK_Recovery
-            host = new_recovered
+            new_removed = popr!(rng, infectives)
+            kind = EK_Removal
+            host = new_removed
 
         elseif event_type == 4  # Sampling
-            new_sampled = popr!(infectives)
+            new_sampled = popr!(rng, infectives)
 
-            # Determine if sampled individual recovers/removes
-            if rand() < r
+            # Determine if sampled individual is removed.
+            if rand(rng) < r
                 I -= 1; R += 1
                 kind = EK_SerialSampling
                 host = new_sampled
             else
-                # If not recovered, put back into infectives
+                # If not removed, put back into infectives
                 kind = EK_FossilizedSampling
                 host = new_sampled
                 push!(infectives, new_sampled)
@@ -113,7 +114,7 @@ function gillespie(S₀::Real,
         # Update rates
         λ[1] = isfinite(S) ? β * S * I / N : β * I      # Transmission
         λ[2] = iszero(E) ? 0.0 : α * E              # Activation
-        λ[3] = γ * I              # Recovery
+        λ[3] = γ * I              # Removal
         λ[4] = ψ * I              # Sampling
 
     end
@@ -122,3 +123,14 @@ function gillespie(S₀::Real,
     validate_event_log(el; population_size=population_size)
     return el
 end
+
+
+gillespie(S₀::Real,
+          E₀::Int,
+          I₀::Int,
+          β::Float64,
+          α::Float64,
+          γ::Float64,
+          ψ::Float64,
+          r::Float64) =
+    gillespie(Random.default_rng(), S₀, E₀, I₀, β, α, γ, ψ, r)

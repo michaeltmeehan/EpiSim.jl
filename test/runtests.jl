@@ -15,10 +15,6 @@ function assert_eventlog_invariants(el::EventLog)
     @test validate_event_log(el; throw=false)
 end
 
-event_count(el::EventLog, kind::EventKind) = count(==(kind), el.kind)
-
-final_size(el::EventLog) = event_count(el, EK_Seeding) + event_count(el, EK_Transmission)
-
 function mean_summary(simulator, nrep::Int; seed::Int)
     Random.seed!(seed)
     final_sizes = Vector{Int}(undef, nrep)
@@ -48,7 +44,7 @@ function seir_state_at(el::EventLog, t::Float64, S0::Int, E0::Int, I0::Int)
         elseif kind == EK_Activation
             E -= 1
             I += 1
-        elseif kind == EK_Recovery || kind == EK_SerialSampling
+        elseif kind == EK_Removal || kind == EK_SerialSampling
             I -= 1
         end
     end
@@ -152,6 +148,235 @@ end
 
 total_variation_distance(p, q) = 0.5 * sum(abs.(p .- q))
 
+@testset "event-log processing helpers" begin
+    el = EventLog(
+        [0.0, 0.0, 0.5, 0.7, 1.0, 1.2, 1.2, 1.5],
+        [1, 2, 3, 1, 3, 2, 3, 1],
+        [0, 0, 1, 0, 0, 0, 0, 0],
+        [EK_Seeding, EK_Seeding, EK_Transmission, EK_FossilizedSampling,
+         EK_Activation, EK_SerialSampling, EK_Removal, EK_Activation],
+    )
+    original = (copy(el.time), copy(el.host), copy(el.infector), copy(el.kind))
+
+    @test total_events(el) == 8
+    @test event_count(el, EK_Seeding) == 2
+    @test event_count(el, EK_Activation) == 2
+    @test event_indices(el, EK_Activation) == [5, 8]
+    @test event_times(el, EK_Activation) == [1.0, 1.5]
+    @test event_indices(el, EK_None) == Int[]
+    @test event_times(el, EK_None) == Float64[]
+
+    @test first_event_time(el, EK_Activation) == 1.0
+    @test last_event_time(el, EK_Activation) == 1.5
+    @test first_event_time(el, EK_None) === nothing
+    @test last_event_time(el, EK_None) === nothing
+    @test has_event_kind(el, EK_SerialSampling)
+    @test !has_event_kind(el, EK_None)
+
+    @test observed_hosts(el) == [1, 2, 3]
+    @test observed_hosts(EventLog([0.5], [3], [9], [EK_Transmission]); include_sources=false) == [3]
+    @test distinct_host_count(el) == 3
+
+    summary = host_event_summary(el)
+    @test summary isa HostEventSummary
+    @test length(summary) == 3
+    @test summary.host_id == [1, 2, 3]
+    @test summary.transmissions_caused == [1, 0, 0]
+    @test summary.samples == [1, 1, 0]
+    @test summary.removals == [0, 1, 1]
+    @test summary.activations == [1, 0, 1]
+
+    empty = EventLog(Float64[], Int[], Int[], EventKind[])
+    empty_summary = host_event_summary(empty)
+    @test total_events(empty) == 0
+    @test observed_hosts(empty) == Int[]
+    @test distinct_host_count(empty) == 0
+    @test event_indices(empty, EK_Transmission) == Int[]
+    @test event_times(empty, EK_Transmission) == Float64[]
+    @test first_event_time(empty, EK_Transmission) === nothing
+    @test last_event_time(empty, EK_Transmission) === nothing
+    @test empty_summary.host_id == Int[]
+    @test empty_summary.transmissions_caused == Int[]
+    @test empty_summary.samples == Int[]
+    @test empty_summary.removals == Int[]
+    @test empty_summary.activations == Int[]
+
+    @test (el.time, el.host, el.infector, el.kind) == original
+end
+
+@testset "event-time state-count recovery" begin
+    el = EventLog(
+        [0.0, 0.0, 0.5, 1.0, 1.0, 1.5],
+        [1, 2, 3, 1, 3, 2],
+        [0, 0, 1, 0, 0, 0],
+        [EK_Seeding, EK_Seeding, EK_Transmission, EK_Activation, EK_Activation, EK_Removal],
+    )
+    original = (copy(el.time), copy(el.host), copy(el.infector), copy(el.kind))
+
+    traj = event_time_state_counts(el; S0=3, E0=1, I0=1)
+
+    @test traj isa StateCountTrajectory
+    @test length(traj) == length(el) + 1
+    @test traj.time == [0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.5]
+    @test traj.S == [3, 3, 3, 2, 2, 2, 2]
+    @test traj.E == [1, 1, 1, 2, 1, 0, 0]
+    @test traj.I == [1, 1, 1, 1, 2, 3, 2]
+    @test traj.R == [0, 0, 0, 0, 0, 0, 1]
+    @test (el.time, el.host, el.infector, el.kind) == original
+
+    empty = EventLog(Float64[], Int[], Int[], EventKind[])
+    empty_traj = event_time_state_counts(empty; S0=5, E0=0, I0=0, R0=0)
+    @test length(empty_traj) == 1
+    @test empty_traj.time == [0.0]
+    @test empty_traj.S == [5]
+    @test empty_traj.E == [0]
+    @test empty_traj.I == [0]
+    @test empty_traj.R == [0]
+
+    sampled = EventLog(
+        [0.0, 0.2, 0.2, 0.3],
+        [1, 1, 1, 1],
+        [0, 0, 0, 0],
+        [EK_Seeding, EK_FossilizedSampling, EK_FossilizedSampling, EK_SerialSampling],
+    )
+    sampled_traj = event_time_state_counts(sampled; S0=0, E0=0, I0=1)
+    @test sampled_traj.time == [0.0, 0.0, 0.2, 0.2, 0.3]
+    @test sampled_traj.I == [1, 1, 1, 1, 0]
+    @test sampled_traj.R == [0, 0, 0, 0, 1]
+
+    simulated = gillespie(Random.MersenneTwister(901), 5, 0, 1, 0.7, 1.0, 1.0, 0.2, 0.5)
+    simulated_traj = event_time_state_counts(simulated; S0=5, E0=0, I0=1)
+    @test simulated_traj.S[end] == 5 - event_count(simulated, EK_Transmission)
+    @test simulated_traj.E[end] == event_count(simulated, EK_Transmission) - event_count(simulated, EK_Activation)
+    @test simulated_traj.I[end] == 1 + event_count(simulated, EK_Activation) -
+                                   event_count(simulated, EK_Removal) -
+                                   event_count(simulated, EK_SerialSampling)
+    @test simulated_traj.R[end] == event_count(simulated, EK_Removal) +
+                                   event_count(simulated, EK_SerialSampling)
+
+    @test_throws ArgumentError event_time_state_counts(el; S0=-1, E0=1, I0=1)
+    @test_throws ArgumentError event_time_state_counts(el; S0=0, E0=0, I0=0)
+end
+
+@testset "ensemble derived helpers over retained logs" begin
+    retained = run_ensemble(
+        rng -> gillespie(rng, 5, 0, 1, 0.4, 1.0, 1.0, 0.0, 0.0),
+        3;
+        rng=Random.MersenneTwister(7701),
+        retain_logs=true,
+    )
+    logs_before = [(copy(log.time), copy(log.host), copy(log.infector), copy(log.kind)) for log in retained.logs]
+    summary_before = (
+        copy(retained.final_size),
+        copy(retained.total_events),
+        copy(retained.final_time),
+        copy(retained.transmissions),
+        copy(retained.activations),
+        copy(retained.removals),
+        copy(retained.fossilized_samples),
+        copy(retained.serial_samples),
+    )
+
+    trajectories = ensemble_state_trajectories(retained; S0=5, E0=0, I0=1)
+    @test length(trajectories) == 3
+    @test all(traj -> traj isa StateCountTrajectory, trajectories)
+    @test trajectories[1].time == event_time_state_counts(retained.logs[1]; S0=5, E0=0, I0=1).time
+    @test trajectories[1].S == event_time_state_counts(retained.logs[1]; S0=5, E0=0, I0=1).S
+    @test [last(traj.R) for traj in trajectories] == retained.removals .+ retained.serial_samples
+
+    host_summaries = ensemble_host_event_summaries(retained)
+    @test length(host_summaries) == 3
+    @test all(summary -> summary isa HostEventSummary, host_summaries)
+    @test host_summaries[1].host_id == host_event_summary(retained.logs[1]).host_id
+    @test host_summaries[1].removals == host_event_summary(retained.logs[1]).removals
+
+    @test [(log.time, log.host, log.infector, log.kind) for log in retained.logs] == logs_before
+    @test summary_before == (
+        retained.final_size,
+        retained.total_events,
+        retained.final_time,
+        retained.transmissions,
+        retained.activations,
+        retained.removals,
+        retained.fossilized_samples,
+        retained.serial_samples,
+    )
+
+    not_retained = run_ensemble(
+        rng -> gillespie(rng, 5, 0, 1, 0.4, 1.0, 1.0, 0.0, 0.0),
+        1;
+        rng=Random.MersenneTwister(7702),
+    )
+    @test_throws ArgumentError ensemble_state_trajectories(not_retained; S0=5, E0=0, I0=1)
+    @test_throws ArgumentError ensemble_host_event_summaries(not_retained)
+
+    empty = run_ensemble(
+        rng -> EventLog(Float64[], Int[], Int[], EventKind[]),
+        0;
+        retain_logs=true,
+    )
+    @test ensemble_state_trajectories(empty; S0=5, E0=0, I0=0) == StateCountTrajectory[]
+    @test ensemble_host_event_summaries(empty) == HostEventSummary[]
+end
+
+@testset "compact ensemble summaries" begin
+    summary = run_ensemble(
+        rng -> gillespie(rng, 5, 0, 1, 0.0, 1.0, 1.0, 0.0, 0.0),
+        4;
+        rng=Random.MersenneTwister(3301),
+    )
+
+    @test summary isa EnsembleSummary
+    @test length(summary) == 4
+    @test summary.nrep == 4
+    @test summary.logs === nothing
+    @test summary.final_size == fill(1, 4)
+    @test summary.transmissions == fill(0, 4)
+    @test summary.removals == fill(1, 4)
+    @test summary.serial_samples == fill(0, 4)
+    @test summary.fossilized_samples == fill(0, 4)
+    @test summary.total_events == fill(2, 4)
+    @test all(>(0.0), summary.final_time)
+    @test mean_final_size(summary) == 1.0
+    @test attack_rate(summary, 6) == 1 / 6
+
+    retained = run_ensemble(
+        rng -> gillespie(rng, 5, 0, 1, 0.0, 1.0, 1.0, 0.0, 0.0),
+        2;
+        rng=Random.MersenneTwister(3302),
+        retain_logs=true,
+    )
+
+    @test retained.logs !== nothing
+    @test length(retained.logs) == 2
+    @test all(log -> log isa EventLog, retained.logs)
+    @test retained.final_size == final_size.(retained.logs)
+    @test retained.final_time == final_time.(retained.logs)
+
+    again = run_ensemble(
+        rng -> gillespie(rng, 5, 0, 1, 0.0, 1.0, 1.0, 0.0, 0.0),
+        2;
+        rng=Random.MersenneTwister(3302),
+        retain_logs=true,
+    )
+    @test retained.final_time == again.final_time
+    @test retained.logs[1].time == again.logs[1].time
+
+    Random.seed!(4401)
+    expected_global_draw = rand()
+    Random.seed!(4401)
+    run_ensemble(
+        rng -> gillespie(rng, 5, 0, 1, 0.0, 1.0, 1.0, 0.0, 0.0),
+        2;
+        rng=Random.MersenneTwister(4402),
+    )
+    @test rand() == expected_global_draw
+
+    @test_throws ArgumentError run_ensemble(rng -> nothing, 1)
+    @test_throws ArgumentError run_ensemble(rng -> EventLog(1), -1)
+    @test_throws ArgumentError attack_rate(summary, 0)
+end
+
 @testset "EventLog" begin
     el = EventLog(3)
 
@@ -180,7 +405,7 @@ end
         [0.0, 1.0, 1.5, 2.0, 2.5],
         [1, 2, 2, 2, 1],
         [0, 1, 0, 0, 0],
-        [EK_Seeding, EK_Transmission, EK_Activation, EK_FossilizedSampling, EK_Recovery],
+        [EK_Seeding, EK_Transmission, EK_Activation, EK_FossilizedSampling, EK_Removal],
     )
     @test validate_event_log(valid; population_size=2)
 
@@ -246,8 +471,8 @@ end
     @test validate_event_log(el; population_size=6)
     @test count(==(EK_Seeding), el.kind) == 1
     @test count(==(EK_Transmission), el.kind) == 0
-    @test count(==(EK_Recovery), el.kind) == 1
-    @test el.kind[end] == EK_Recovery
+    @test count(==(EK_Removal), el.kind) == 1
+    @test el.kind[end] == EK_Removal
 end
 
 @testset "shared zero-transmission limiting behaviour" begin
@@ -261,7 +486,7 @@ end
         @test event_count(el, EK_Transmission) == 0
         @test final_size(el) == 3
         @test event_count(el, EK_Activation) == 1
-        @test event_count(el, EK_Recovery) == 3
+        @test event_count(el, EK_Removal) == 3
     end
 end
 
