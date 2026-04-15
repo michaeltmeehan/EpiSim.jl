@@ -148,6 +148,64 @@ end
 
 total_variation_distance(p, q) = 0.5 * sum(abs.(p .- q))
 
+@testset "visualization support summaries" begin
+    traj1 = StateCountTrajectory(
+        [0.0, 0.5, 0.5, 1.0],
+        [5, 4, 4, 4],
+        [0, 1, 0, 0],
+        [1, 1, 2, 1],
+        [0, 0, 0, 1],
+    )
+    traj2 = StateCountTrajectory(
+        [0.0, 0.25, 0.75],
+        [3, 2, 2],
+        [0, 1, 0],
+        [1, 1, 2],
+        [0, 0, 0],
+    )
+    traj1_before = (copy(traj1.time), copy(traj1.S), copy(traj1.E), copy(traj1.I), copy(traj1.R))
+
+    time, infectious = trajectory_series(traj1, :I)
+    @test time === traj1.time
+    @test infectious === traj1.I
+    @test time == [0.0, 0.5, 0.5, 1.0]
+    @test infectious == [1, 1, 2, 1]
+
+    all_series = trajectory_series(traj1)
+    @test all_series.S == (traj1.time, traj1.S)
+    @test all_series.E == (traj1.time, traj1.E)
+    @test all_series.I == (traj1.time, traj1.I)
+    @test all_series.R == (traj1.time, traj1.R)
+    @test_throws ArgumentError trajectory_series(traj1, :X)
+
+    trajs = [traj1, traj2]
+    @test trajectory_final_sizes(trajs) == [2, 2]
+    @test trajectory_final_times(trajs) == [1.0, 0.75]
+    @test peak_infectious(trajs) == [2, 2]
+    @test peak_infectious_time(trajs) == [0.5, 0.75]
+
+    host_summary = HostEventSummary([1, 3], [2, 0], [1, 2], [0, 1], [1, 0])
+    host_summary_before = (
+        copy(host_summary.host_id),
+        copy(host_summary.transmissions_caused),
+        copy(host_summary.samples),
+        copy(host_summary.removals),
+        copy(host_summary.activations),
+    )
+    hosts, transmissions = host_series(host_summary, :transmissions)
+    @test hosts === host_summary.host_id
+    @test transmissions === host_summary.transmissions_caused
+    @test host_series(host_summary, :transmissions_caused) == (host_summary.host_id, host_summary.transmissions_caused)
+    @test host_series(host_summary, :samples) == (host_summary.host_id, host_summary.samples)
+    @test host_series(host_summary, :removals) == (host_summary.host_id, host_summary.removals)
+    @test host_series(host_summary, :activations) == (host_summary.host_id, host_summary.activations)
+    @test_throws ArgumentError host_series(host_summary, :secondary_cases)
+
+    @test (traj1.time, traj1.S, traj1.E, traj1.I, traj1.R) == traj1_before
+    @test (host_summary.host_id, host_summary.transmissions_caused, host_summary.samples,
+           host_summary.removals, host_summary.activations) == host_summary_before
+end
+
 @testset "event-log processing helpers" begin
     el = EventLog(
         [0.0, 0.0, 0.5, 0.7, 1.0, 1.2, 1.2, 1.5],

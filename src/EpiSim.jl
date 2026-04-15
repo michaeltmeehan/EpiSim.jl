@@ -37,4 +37,8 @@ include("analysis/ensemble_derived.jl")
 
 export ensemble_state_trajectories, ensemble_host_event_summaries
 
+include("analysis/visualization_support.jl")
+
+export trajectory_series, trajectory_final_sizes, trajectory_final_times, peak_infectious, peak_infectious_time, host_series
+
 end # module EpiSim

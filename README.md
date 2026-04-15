@@ -25,6 +25,7 @@ using EpiSim
 
 log = gillespie(100, 0, 1, 0.8, 1.0, 1.0, 0.0, 0.0)
 trajectory = event_time_state_counts(log; S0=100, E0=0, I0=1)
+time, infectious = trajectory_series(trajectory, :I)
 ```
 
 ## Event-log helpers
@@ -34,6 +35,7 @@ Interrogate one `EventLog` without changing its compact columnar storage:
 ```julia
 transmission_times = event_times(log, EK_Transmission)
 hosts = host_event_summary(log)
+host_ids, transmissions = host_series(hosts, :transmissions)
 ```
 
 ## Ensemble summaries
@@ -68,6 +70,7 @@ summary = run_ensemble(
 
 trajectories = ensemble_state_trajectories(summary; S0=100, E0=0, I0=1)
 host_summaries = ensemble_host_event_summaries(summary)
+peaks = peak_infectious(trajectories)
 ```
 
 ## Installation
