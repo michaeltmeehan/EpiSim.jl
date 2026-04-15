@@ -13,6 +13,35 @@ The current recovered package scope is intentionally narrow:
 
 The package does not provide tree extraction, tree likelihoods, birth-death analytical likelihoods, or orchestration logic for the broader modelling ecosystem.
 
+## Analysis workflow
+
+The analysis helpers are layered on top of `EventLog` and can be used in small
+steps:
+
+```julia
+using EpiSim
+using Random
+
+log = gillespie(100, 0, 1, 0.8, 1.0, 1.0, 0.0, 0.0)
+trajectory = event_time_state_counts(log; S0=100, E0=0, I0=1)
+host_summary = host_event_summary(log)
+time, infectious = trajectory_series(trajectory, :I)
+host_ids, transmissions = host_series(host_summary, :transmissions)
+
+ensemble = run_ensemble(
+    rng -> gillespie(rng, 100, 0, 1, 0.8, 1.0, 1.0, 0.0, 0.0),
+    100;
+    rng=Random.MersenneTwister(42),
+    retain_logs=true,
+)
+
+trajectories = ensemble_state_trajectories(ensemble; S0=100, E0=0, I0=1)
+host_summaries = ensemble_host_event_summaries(ensemble)
+ensemble_stats = ensemble_aggregate_summary(ensemble)
+trajectory_stats = trajectory_aggregate_summary(trajectories)
+host_stats = host_aggregate_summary(host_summaries)
+```
+
 ## Event-time state counts
 
 Recover a compact trajectory from one `EventLog` by supplying the initial state.

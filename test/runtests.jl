@@ -226,7 +226,7 @@ total_variation_distance(p, q) = 0.5 * sum(abs.(p .- q))
     @test [(t.time, t.S, t.E, t.I, t.R) for t in trajs] == trajs_before
     @test [(s.host_id, s.transmissions_caused, s.samples, s.removals, s.activations) for s in host_summaries] == host_before
 
-    @test_throws ArgumentError scalar_summary(Int[])
+    @test_throws ArgumentError EpiSim.scalar_summary(Int[])
     @test_throws ArgumentError ensemble_aggregate_summary(EnsembleSummary(0, Int[], Int[], Float64[], Int[], Int[], Int[], Int[], Int[], nothing))
     @test_throws ArgumentError trajectory_aggregate_summary(StateCountTrajectory[])
     @test_throws ArgumentError host_aggregate_summary(HostEventSummary[])

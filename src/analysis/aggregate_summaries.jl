@@ -90,7 +90,7 @@ end
 Aggregate primitive per-replicate fields already stored in an ensemble summary.
 Sample counts combine fossilized and serial sampling events per replicate.
 `total_samples` is the ensemble-wide sum of fossilized plus serial sampling
-events.
+events. Empty ensembles throw `ArgumentError`.
 """
 function ensemble_aggregate_summary(summary::EnsembleSummary)
     length(summary) == 0 && throw(ArgumentError("cannot summarize an empty ensemble"))
@@ -112,6 +112,7 @@ end
 
 Aggregate scalar trajectory summaries computed independently for each
 trajectory. No interpolation, resampling, or common-axis alignment is performed.
+Empty trajectory collections throw `ArgumentError`.
 """
 function trajectory_aggregate_summary(trajs::AbstractVector{<:StateCountTrajectory})
     isempty(trajs) && throw(ArgumentError("cannot summarize an empty trajectory collection"))
@@ -136,7 +137,8 @@ end
 Aggregate replicate-level host participation summaries. Per-host quantities are
 computed within each replicate, then summarized across replicates. Host IDs are
 not matched across replicates. Replicates with zero observed hosts contribute
-`0` to the per-host mean and maximum host-participation metrics.
+`0` to the per-host mean and maximum host-participation metrics. Empty
+host-summary collections throw `ArgumentError`.
 """
 function host_aggregate_summary(summaries::AbstractVector{<:HostEventSummary})
     isempty(summaries) && throw(ArgumentError("cannot summarize an empty host-summary collection"))

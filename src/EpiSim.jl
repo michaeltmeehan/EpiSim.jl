@@ -9,6 +9,7 @@ include("utils/random.jl")
 
 export popr!, wsample, wsampleindex, wsampleindex_cols
 
+# Core event-log and simulation API.
 include("core/events.jl")
 
 export EventLog, EventKind, EK_None, EK_Seeding, EK_Transmission, EK_FossilizedSampling, EK_SerialSampling, EK_Removal, EK_Activation, validate_event_log
@@ -21,6 +22,7 @@ include("core/gillespie.jl")
 
 export gillespie
 
+# Derived analysis and summary API.
 include("analysis/ensemble.jl")
 
 export EnsembleSummary, run_ensemble, final_size, event_count, final_time, mean_final_size, mean_final_time, attack_rate
@@ -43,6 +45,6 @@ export trajectory_series, trajectory_final_sizes, trajectory_final_times, peak_i
 
 include("analysis/aggregate_summaries.jl")
 
-export ScalarSummary, EnsembleAggregateSummary, TrajectoryAggregateSummary, HostAggregateSummary, scalar_summary, ensemble_aggregate_summary, trajectory_aggregate_summary, host_aggregate_summary
+export ScalarSummary, EnsembleAggregateSummary, TrajectoryAggregateSummary, HostAggregateSummary, ensemble_aggregate_summary, trajectory_aggregate_summary, host_aggregate_summary
 
 end # module EpiSim
