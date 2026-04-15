@@ -41,4 +41,8 @@ include("analysis/visualization_support.jl")
 
 export trajectory_series, trajectory_final_sizes, trajectory_final_times, peak_infectious, peak_infectious_time, host_series
 
+include("analysis/aggregate_summaries.jl")
+
+export ScalarSummary, EnsembleAggregateSummary, TrajectoryAggregateSummary, HostAggregateSummary, scalar_summary, ensemble_aggregate_summary, trajectory_aggregate_summary, host_aggregate_summary
+
 end # module EpiSim

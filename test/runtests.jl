@@ -148,6 +148,90 @@ end
 
 total_variation_distance(p, q) = 0.5 * sum(abs.(p .- q))
 
+@testset "aggregate summary helpers" begin
+    ensemble = EnsembleSummary(
+        3,
+        [2, 4, 6],
+        [5, 7, 9],
+        [1.0, 2.0, 4.0],
+        [1, 3, 5],
+        [0, 1, 2],
+        [1, 1, 3],
+        [2, 0, 1],
+        [0, 1, 1],
+        nothing,
+    )
+    ensemble_before = (
+        copy(ensemble.final_size),
+        copy(ensemble.total_events),
+        copy(ensemble.final_time),
+        copy(ensemble.transmissions),
+        copy(ensemble.activations),
+        copy(ensemble.removals),
+        copy(ensemble.fossilized_samples),
+        copy(ensemble.serial_samples),
+    )
+
+    ensemble_stats = ensemble_aggregate_summary(ensemble)
+    @test ensemble_stats isa EnsembleAggregateSummary
+    @test ensemble_stats.final_size == ScalarSummary(4.0, 2.0, 6.0)
+    @test ensemble_stats.final_time == ScalarSummary(7 / 3, 1.0, 4.0)
+    @test ensemble_stats.transmissions == ScalarSummary(3.0, 1.0, 5.0)
+    @test ensemble_stats.activations == ScalarSummary(1.0, 0.0, 2.0)
+    @test ensemble_stats.removals == ScalarSummary(5 / 3, 1.0, 3.0)
+    @test ensemble_stats.samples == ScalarSummary(5 / 3, 1.0, 2.0)
+    @test ensemble_stats.total_samples == 5
+
+    trajs = [
+        StateCountTrajectory([0.0, 1.0, 2.0], [5, 4, 4], [0, 1, 0], [1, 2, 1], [0, 0, 2]),
+        StateCountTrajectory([0.0, 0.5], [3, 2], [0, 0], [1, 3], [0, 1]),
+    ]
+    trajs_before = [(copy(t.time), copy(t.S), copy(t.E), copy(t.I), copy(t.R)) for t in trajs]
+
+    trajectory_stats = trajectory_aggregate_summary(trajs)
+    @test trajectory_stats isa TrajectoryAggregateSummary
+    @test trajectory_stats.peak_infectious == ScalarSummary(2.5, 2.0, 3.0)
+    @test trajectory_stats.peak_infectious_time == ScalarSummary(0.75, 0.5, 1.0)
+    @test trajectory_stats.final_removed == ScalarSummary(1.5, 1.0, 2.0)
+    @test trajectory_stats.final_time == ScalarSummary(1.25, 0.5, 2.0)
+
+    host_summaries = [
+        HostEventSummary([1, 2], [2, 0], [1, 3], [0, 1], [1, 1]),
+        HostEventSummary([4], [3], [0], [2], [1]),
+    ]
+    host_before = [
+        (copy(s.host_id), copy(s.transmissions_caused), copy(s.samples), copy(s.removals), copy(s.activations))
+        for s in host_summaries
+    ]
+
+    host_stats = host_aggregate_summary(host_summaries)
+    @test host_stats isa HostAggregateSummary
+    @test host_stats.observed_hosts == ScalarSummary(1.5, 1.0, 2.0)
+    @test host_stats.mean_transmissions_per_host == ScalarSummary(2.0, 1.0, 3.0)
+    @test host_stats.max_transmissions_per_host == ScalarSummary(2.5, 2.0, 3.0)
+    @test host_stats.mean_samples_per_host == ScalarSummary(1.0, 0.0, 2.0)
+    @test host_stats.mean_removals_per_host == ScalarSummary(1.25, 0.5, 2.0)
+    @test host_stats.mean_activations_per_host == ScalarSummary(1.0, 1.0, 1.0)
+
+    @test ensemble_before == (
+        ensemble.final_size,
+        ensemble.total_events,
+        ensemble.final_time,
+        ensemble.transmissions,
+        ensemble.activations,
+        ensemble.removals,
+        ensemble.fossilized_samples,
+        ensemble.serial_samples,
+    )
+    @test [(t.time, t.S, t.E, t.I, t.R) for t in trajs] == trajs_before
+    @test [(s.host_id, s.transmissions_caused, s.samples, s.removals, s.activations) for s in host_summaries] == host_before
+
+    @test_throws ArgumentError scalar_summary(Int[])
+    @test_throws ArgumentError ensemble_aggregate_summary(EnsembleSummary(0, Int[], Int[], Float64[], Int[], Int[], Int[], Int[], Int[], nothing))
+    @test_throws ArgumentError trajectory_aggregate_summary(StateCountTrajectory[])
+    @test_throws ArgumentError host_aggregate_summary(HostEventSummary[])
+end
+
 @testset "visualization support summaries" begin
     traj1 = StateCountTrajectory(
         [0.0, 0.5, 0.5, 1.0],

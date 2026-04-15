@@ -56,6 +56,7 @@ summary = run_ensemble(
 mean_final_size(summary)
 mean_final_time(summary)
 attack_rate(summary, 101)
+ensemble_stats = ensemble_aggregate_summary(summary)
 ```
 
 Set `retain_logs=true` when later derived layers need the full event logs:
@@ -71,6 +72,8 @@ summary = run_ensemble(
 trajectories = ensemble_state_trajectories(summary; S0=100, E0=0, I0=1)
 host_summaries = ensemble_host_event_summaries(summary)
 peaks = peak_infectious(trajectories)
+trajectory_stats = trajectory_aggregate_summary(trajectories)
+host_stats = host_aggregate_summary(host_summaries)
 ```
 
 ## Installation
