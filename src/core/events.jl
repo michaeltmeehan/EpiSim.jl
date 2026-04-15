@@ -162,13 +162,18 @@ end
 
 
 function Base.show(io::IO, record::EventRecord)
-    print(io, "EventRecord(time=", record.time,
-          ", host=", record.host,
-          ", infector=", record.infector,
-          ", kind=")
+    print(io, "EventRecord(time=", _compact_time(record.time),
+          ", host=", record.host)
+    if record.kind == EK_Transmission
+        print(io, ", infector=", record.infector)
+    end
+    print(io, ", kind=")
     show(io, record.kind)
     print(io, ")")
 end
+
+
+_compact_time(t::Float64) = string(round(t; digits=3))
 
 
 function EventLog(n::Int)

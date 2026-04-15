@@ -230,7 +230,10 @@ end
         EventRecord(1.2, 1, 0, EK_Removal),
     ]
     @test_throws BoundsError log[0]
-    @test occursin("EventRecord(time=0.4, host=2, infector=1, kind=Transmission)", sprint(show, log[2]))
+    @test sprint(show, log[1]) == "EventRecord(time=0.0, host=1, kind=Seeding)"
+    @test sprint(show, EventRecord(1.1926, 1, 0, EK_Activation)) == "EventRecord(time=1.193, host=1, kind=Activation)"
+    @test sprint(show, EventRecord(1.3121, 1, 0, EK_SerialSampling)) == "EventRecord(time=1.312, host=1, kind=SerialSampling)"
+    @test sprint(show, EventRecord(2.4812, 4, 1, EK_Transmission)) == "EventRecord(time=2.481, host=4, infector=1, kind=Transmission)"
 
     empty_log = EventLog(Float64[], Int[], Int[], EventKind[])
     @test isempty(empty_log)
