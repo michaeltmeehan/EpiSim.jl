@@ -1,5 +1,5 @@
 _dirac(x::Float64) = DiscreteNonParametric([x], [1.0])
-_to_dist(x::Union{Float64, Distribution}, exp_default=false) = x isa Distribution ? x : (exp_default ? Exponential(x) : _dirac(x))
+_to_dist(x::Union{Float64, Distribution}, exp_default=false) = x isa Distribution ? x : (exp_default && x > 0.0 ? Exponential(x) : _dirac(x))
 
 
 @enum StateKind::UInt8 begin
