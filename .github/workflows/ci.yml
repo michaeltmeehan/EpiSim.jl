@@ -36,5 +36,8 @@ jobs:
       - name: Instantiate dependencies
         run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
+      - name: Build package
+        run: julia --project=. -e 'using Pkg; Pkg.build()'
+
       - name: Run tests
         run: julia --project=. -e 'using Pkg; Pkg.test()'
